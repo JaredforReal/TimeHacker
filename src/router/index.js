@@ -1,0 +1,49 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import Login from '../views/LoginView.vue'
+import Home from '../views/HomeView.vue'
+import { supabase } from '../supabase.js'
+
+const routes = [
+  {
+    path: '/',
+    name: 'login',
+    component: Login
+  },
+  {
+    path: '/home',
+    name: 'home',
+    component: Home,
+    meta: { requiresAuth: true }
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+// 添加路由守卫
+router.beforeEach(async (to, from, next) => {
+    try {
+        // 获取当前会话
+        const { data: { session } } = await supabase.auth.getSession()
+    
+        // 需要认证但未登录
+        if (to.meta.requiresAuth && !session) {
+            next('/')
+        }
+        // 已登录但访问登录页
+        else if (to.name === 'login' && session) {
+            next('/home')
+        }
+        // 其他情况正常放行
+        else {
+            next()
+        }
+    } catch (error) {
+        console.error('Error during route guard:', error)
+        next('/')
+    }
+})
+
+export default router

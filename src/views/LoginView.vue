@@ -1,92 +1,69 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
-      <div>
-        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          {{ isLogin ? '登录您的账户' : '注册新账户' }}
-        </h2>
-      </div>
-      
-      <div class="text-center">
-        <button 
-          @click="isLogin = !isLogin"
-          class="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-        >
-          {{ isLogin ? '没有账户？立即注册' : '已有账户？立即登录' }}
-        </button>
+  <div class="auth-container">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1>{{ isLogin ? '欢迎回来' : '创建账户' }}</h1>
+        <p>{{ isLogin ? '请输入您的登录信息' : '只需几步即可完成注册' }}</p>
       </div>
 
-      <form class="mt-8 space-y-6" @submit.prevent="handleSubmit">
-        <div class="rounded-md shadow-sm space-y-4">
-          <div>
-            <label for="email" class="sr-only">邮箱地址</label>
-            <input
-              id="email"
-              v-model="form.email"
-              name="email"
-              type="email"
-              autocomplete="email"
-              required
-              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="邮箱地址"
-            />
-          </div>
-          <div>
-            <label for="password" class="sr-only">密码</label>
-            <input
-              id="password"
-              v-model="form.password"
-              name="password"
-              type="password"
-              autocomplete="current-password"
-              required
-              class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="密码"
-              minlength="6"
-            />
-          </div>
-        </div>
-
-        <div v-if="isLogin" class="flex items-center">
+      <form @submit.prevent="handleSubmit" class="auth-form">
+        <div class="form-group">
+          <label for="email">邮箱地址</label>
           <input
-            id="remember-me"
-            name="remember-me"
-            type="checkbox"
-            v-model="form.rememberMe"
-            class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+            id="email"
+            v-model="form.email"
+            type="email"
+            required
+            placeholder="your@email.com"
           />
-          <label for="remember-me" class="ml-2 block text-sm text-gray-900">
-            记住我
-          </label>
         </div>
 
-        <div>
-          <button
-            type="submit"
-            class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            :disabled="loading"
-          >
-            <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-              <svg
-                class="h-5 w-5 text-indigo-500 group-hover:text-indigo-400"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </span>
-            {{ loading ? '处理中...' : isLogin ? '登录' : '注册' }}
-          </button>
+        <div class="form-group">
+          <label for="password">密码</label>
+          <input
+            id="password"
+            v-model="form.password"
+            type="password"
+            required
+            minlength="6"
+            placeholder="至少6个字符"
+          />
+        </div>
+
+        <div v-if="isLogin" class="remember-forgot">
+          <div class="remember-me">
+            <input
+              id="remember-me"
+              v-model="form.rememberMe"
+              type="checkbox"
+            />
+            <label for="remember-me">记住我</label>
+          </div>
+          <a href="#" class="forgot-password">忘记密码?</a>
+        </div>
+
+        <button
+          type="submit"
+          :disabled="loading"
+          class="submit-btn"
+        >
+          {{ loading ? '处理中...' : isLogin ? '登录' : '注册' }}
+        </button>
+
+        <div v-if="error" class="error-message">
+          {{ error }}
         </div>
       </form>
 
-      <div v-if="error" class="text-red-500 text-sm mt-2 text-center">{{ error }}</div>
+      <div class="auth-footer">
+        <span>{{ isLogin ? '还没有账户?' : '已有账户?' }}</span>
+        <button
+          @click="isLogin = !isLogin"
+          class="toggle-btn"
+        >
+          {{ isLogin ? '立即注册' : '立即登录' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -113,24 +90,20 @@ const handleSubmit = async () => {
     error.value = ''
     
     if (isLogin.value) {
-      // 登录逻辑
       const { error: authError } = await supabase.auth.signInWithPassword({
         email: form.value.email,
         password: form.value.password
       })
       
       if (authError) throw authError
-      
       router.push('/home')
     } else {
-      // 注册逻辑
       const { error: signUpError } = await supabase.auth.signUp({
         email: form.value.email,
         password: form.value.password,
       })
       
       if (signUpError) throw signUpError
-      
       alert('注册成功！请检查您的邮箱以确认账户')
       isLogin.value = true
     }
@@ -141,3 +114,162 @@ const handleSubmit = async () => {
   }
 }
 </script>
+
+<style scoped>
+/* 基础样式 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* 容器样式 */
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f9ff;
+  padding: 20px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* 头部样式 */
+.auth-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.auth-header h1 {
+  font-size: 24px;
+  font-weight: 400;
+  color: #1e88e5;
+  margin-bottom: 8px;
+}
+
+.auth-header p {
+  color: #616161;
+  font-size: 14px;
+}
+
+/* 表单样式 */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 14px;
+  color: #424242;
+  font-weight: 500;
+}
+
+.form-group input {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #90caf9;
+  box-shadow: 0 0 0 2px rgba(144, 202, 249, 0.3);
+}
+
+/* 记住我 & 忘记密码 */
+.remember-forgot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remember-me input {
+  width: 16px;
+  height: 16px;
+}
+
+.forgot-password {
+  color: #1e88e5;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
+/* 提交按钮 */
+.submit-btn {
+  padding: 12px;
+  background-color: #1e88e5;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.submit-btn:hover {
+  background-color: #1976d2;
+}
+
+.submit-btn:disabled {
+  background-color: #90caf9;
+  cursor: not-allowed;
+}
+
+/* 错误信息 */
+.error-message {
+  padding: 12px;
+  background-color: #ffebee;
+  color: #d32f2f;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 底部切换按钮 */
+.auth-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: #616161;
+}
+
+.toggle-btn {
+  background: none;
+  border: none;
+  color: #1e88e5;
+  cursor: pointer;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.toggle-btn:hover {
+  text-decoration: underline;
+}
+</style>

@@ -1,5 +1,7 @@
 <template>
-  <router-view />
+  <div id="app">
+    <router-view />
+  </div>
 </template>
 
 <script setup>
@@ -21,4 +23,9 @@ supabase.auth.onAuthStateChange((event, session) => {
 <style>
 /* 确保Tailwind样式正常工作 */
 @import './assets/main.css';
+
+#app {
+  min-height: 100vh;
+  background-color: #f0f9ff;
+}
 </style>

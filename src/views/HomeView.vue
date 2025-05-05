@@ -1,34 +1,25 @@
 <template>
-  <div class="min-h-screen bg-gray-100">
-    <nav class="bg-white shadow-sm">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-          <div class="flex items-center">
-            <h1 class="text-xl font-bold text-gray-900">欢迎回来</h1>
-          </div>
-          <div class="flex items-center">
-            <button
-              @click="handleLogout"
-              class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              退出登录
-            </button>
-          </div>
+  <div class="home-container">
+    <nav class="navbar">
+      <div class="container">
+        <div class="navbar-content">
+          <h1 class="logo">欢迎回来</h1>
+          <button @click="handleLogout" class="btn btn-primary">
+            退出登录
+          </button>
         </div>
       </div>
     </nav>
 
-    <div class="py-10">
-      <main>
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-          <div class="px-4 py-8 sm:px-0">
-            <div class="border-4 border-dashed border-gray-200 rounded-lg h-96 flex items-center justify-center">
-              <p class="text-gray-500">这里是您的主页内容</p>
-            </div>
+    <main class="main-content">
+      <div class="container">
+        <div class="dashboard">
+          <div class="placeholder">
+            <p>这里是您的主页内容</p>
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   </div>
 </template>
 
@@ -48,3 +39,51 @@ const handleLogout = async () => {
   }
 }
 </script>
+
+<style scoped>
+.home-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.navbar {
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  padding: 16px 0;
+}
+
+.navbar-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 20px;
+  font-weight: 500;
+  color: #333;
+}
+
+.main-content {
+  flex: 1;
+  padding: 40px 0;
+}
+
+.dashboard {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.placeholder {
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #e0e0e0;
+  border-radius: 8px;
+  color: #757575;
+}
+</style>

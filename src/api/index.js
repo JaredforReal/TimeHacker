@@ -1,6 +1,6 @@
 import { supabase } from '../supabase'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://your-railway-app.up.railway.app'
+const API_BASE_URL = import.meta.env.VITE_API_URL
 
 export const apiClient = {
   // 获取当前用户JWT

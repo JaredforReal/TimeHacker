@@ -1,5 +1,106 @@
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { apiClient } from '../api'
+import { useUserStore } from '../stores/user'
+
+const router = useRouter()
+const userStore = useUserStore()
+
+// 状态管理
+const todos = ref([])
+const newTodoTitle = ref('')
+const newTodoDesc = ref('')
+const isLoading = ref(false)
+const error = ref(null)
+const apiStatus = ref(null)
+
+// 初始化加载
+onMounted(async () => {
+  try {
+    await checkApiHealth()
+    await loadTodos()
+  } catch (err) {
+    error.value = `初始化失败: ${err.message}`
+  }
+})
+
+// 检查后端状态
+const checkApiHealth = async () => {
+  apiStatus.value = await apiClient.healthCheck()
+}
+
+// 加载待办列表
+const loadTodos = async () => {
+  try {
+    isLoading.value = true
+    error.value = null
+    todos.value = await apiClient.fetchTodos()
+  } catch (err) {
+    error.value = `加载失败: ${err.message}`
+    if (err.message.includes('未登录')) {
+      router.push('/login')
+    }
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// 添加新待办
+const handleAddTodo = async () => {
+  if (!newTodoTitle.value.trim()) return
+  
+  try {
+    const createdTodo = await apiClient.createTodo(
+      newTodoTitle.value.trim(),
+      newTodoDesc.value.trim() || null
+    )
+    todos.value = [createdTodo, ...todos.value]
+    newTodoTitle.value = ''
+    newTodoDesc.value = ''
+  } catch (err) {
+    error.value = `添加失败: ${err.message}`
+  }
+}
+
+// 切换完成状态
+const toggleComplete = async (todo) => {
+  try {
+    await apiClient.updateTodo(todo.id, {
+      is_completed: !todo.is_completed
+    })
+    todo.is_completed = !todo.is_completed
+  } catch (err) {
+    error.value = `更新失败: ${err.message}`
+  }
+}
+
+// 删除待办
+const handleDelete = async (id) => {
+  if (!confirm('确定删除此待办？')) return
+  
+  try {
+    await apiClient.deleteTodo(id)
+    todos.value = todos.value.filter(t => t.id !== id)
+  } catch (err) {
+    error.value = `删除失败: ${err.message}`
+  }
+}
+
+// 退出登录
+const handleLogout = async () => {
+  try {
+    await userStore.signOut()
+    router.push('/login')
+  } catch (err) {
+    error.value = `退出失败: ${err.message}`
+  }
+}
+</script>
+
 <template>
   <div class="home-container">
+    <!-- 顶部导航 -->
     <nav class="navbar">
       <div class="container">
         <div class="navbar-content">
@@ -11,174 +112,89 @@
       </div>
     </nav>
 
+    <!-- 主内容区 -->
     <main class="main-content">
       <div class="container">
-        <div class="todo-container">
-          <!-- 添加新待办 -->
-          <div class="todo-form">
-            <input
-              v-model="newTodoTitle"
-              type="text"
-              placeholder="添加新任务..."
-              class="todo-input"
-              @keyup.enter="addTodo"
-            />
-            <button @click="addTodo" class="btn btn-primary" :disabled="isAdding">
-              {{ isAdding ? '添加中...' : '添加' }}
+        <!-- API状态显示 -->
+        <div v-if="apiStatus" class="api-status">
+          后端状态: {{ apiStatus.status }} - {{ apiStatus.message }}
+        </div>
+
+        <!-- 错误提示 -->
+        <div v-if="error" class="error-message">
+          {{ error }}
+        </div>
+
+        <!-- 添加待办表单 -->
+        <div class="todo-form">
+          <input
+            v-model="newTodoTitle"
+            type="text"
+            placeholder="任务标题"
+            class="todo-input"
+            @keyup.enter="handleAddTodo"
+          />
+          <input
+            v-model="newTodoDesc"
+            type="text"
+            placeholder="任务描述（可选）"
+            class="todo-input"
+            @keyup.enter="handleAddTodo"
+          />
+          <button 
+            @click="handleAddTodo" 
+            class="btn btn-primary"
+            :disabled="isLoading"
+          >
+            {{ isLoading ? '处理中...' : '添加任务' }}
+          </button>
+        </div>
+
+        <!-- 加载状态 -->
+        <div v-if="isLoading" class="loading-state">
+          <div class="spinner"></div>
+          加载中...
+        </div>
+
+        <!-- 待办列表 -->
+        <div v-else class="todo-list">
+          <div 
+            v-for="todo in todos" 
+            :key="todo.id" 
+            class="todo-item"
+            :class="{ completed: todo.is_completed }"
+          >
+            <div class="todo-content">
+              <input
+                type="checkbox"
+                :checked="todo.is_completed"
+                @change="() => toggleComplete(todo)"
+                class="todo-checkbox"
+              />
+              <div class="todo-text">
+                <h3>{{ todo.title }}</h3>
+                <p v-if="todo.description">{{ todo.description }}</p>
+                <small>
+                  创建于: {{ new Date(todo.created_at).toLocaleString() }}
+                </small>
+              </div>
+            </div>
+            <button 
+              @click="() => handleDelete(todo.id)"
+              class="btn btn-danger"
+            >
+              删除
             </button>
           </div>
 
-          <!-- 加载状态 -->
-          <div v-if="isLoading" class="loading">加载中...</div>
-
-          <!-- 待办列表 -->
-          <div v-else class="todo-list">
-            <div v-for="todo in todos" :key="todo.id" class="todo-item">
-              <div class="todo-content">
-                <input
-                  type="checkbox"
-                  v-model="todo.is_completed"
-                  @change="updateTodo(todo)"
-                  class="todo-checkbox"
-                />
-                <div class="todo-text" :class="{ completed: todo.is_completed }">
-                  <h3>{{ todo.title }}</h3>
-                  <p v-if="todo.description">{{ todo.description }}</p>
-                </div>
-              </div>
-              <button @click="deleteTodo(todo.id)" class="btn btn-danger" :disabled="isDeleting">
-                删除
-              </button>
-            </div>
+          <div v-if="todos.length === 0" class="empty-state">
+            暂无待办事项，请添加您的第一个任务
           </div>
         </div>
       </div>
     </main>
   </div>
 </template>
-
-<script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '../stores/user'
-
-const router = useRouter()
-const userStore = useUserStore()
-const todos = ref([])
-const newTodoTitle = ref('')
-const isLoading = ref(false)
-const isAdding = ref(false)
-const isDeleting = ref(false)
-
-// 获取当前用户的所有待办
-const fetchTodos = async () => {
-  try {
-    isLoading.value = true
-    const token = (await userStore.supabase.auth.getSession()).data.session?.access_token
-    
-    const response = await fetch('/api/todos', {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    
-    if (!response.ok) throw new Error('获取待办失败')
-    todos.value = await response.json()
-  } catch (error) {
-    console.error('获取待办失败:', error.message)
-  } finally {
-    isLoading.value = false
-  }
-}
-
-// 添加新待办
-const addTodo = async () => {
-  if (!newTodoTitle.value.trim() || isAdding.value) return
-  
-  try {
-    isAdding.value = true
-    const token = (await userStore.supabase.auth.getSession()).data.session?.access_token
-    
-    const response = await fetch('/api/todos', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        title: newTodoTitle.value.trim()
-      })
-    })
-    
-    if (!response.ok) throw new Error('添加待办失败')
-    const newTodo = await response.json()
-    todos.value = [newTodo, ...todos.value]
-    newTodoTitle.value = ''
-  } catch (error) {
-    console.error('添加待办失败:', error.message)
-  } finally {
-    isAdding.value = false
-  }
-}
-
-// 更新待办状态
-const updateTodo = async (todo) => {
-  try {
-    const token = (await userStore.supabase.auth.getSession()).data.session?.access_token
-    
-    await fetch(`/api/todos/${todo.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        is_completed: todo.is_completed
-      })
-    })
-  } catch (error) {
-    console.error('更新待办失败:', error.message)
-    // 恢复原状态
-    todo.is_completed = !todo.is_completed
-  }
-}
-
-// 删除待办
-const deleteTodo = async (id) => {
-  try {
-    isDeleting.value = true
-    const token = (await userStore.supabase.auth.getSession()).data.session?.access_token
-    
-    await fetch(`/api/todos/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    
-    todos.value = todos.value.filter(todo => todo.id !== id)
-  } catch (error) {
-    console.error('删除待办失败:', error.message)
-  } finally {
-    isDeleting.value = false
-  }
-}
-
-// 退出登录
-const handleLogout = async () => {
-  try {
-    await userStore.supabase.auth.signOut()
-    router.push('/')
-  } catch (error) {
-    console.error('退出登录错误:', error.message)
-  }
-}
-
-// 组件挂载时获取待办
-onMounted(() => {
-  fetchTodos()
-})
-</script>
 
 <style scoped>
 .home-container {
@@ -217,26 +233,34 @@ onMounted(() => {
   padding: 0 20px;
 }
 
-.todo-container {
-  background: white;
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+.api-status {
+  padding: 10px;
+  background: #f0f9ff;
+  border-radius: 6px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.error-message {
+  padding: 15px;
+  background: #ffebee;
+  color: #c62828;
+  border-radius: 6px;
+  margin-bottom: 20px;
 }
 
 .todo-form {
   display: flex;
+  flex-direction: column;
   gap: 10px;
   margin-bottom: 30px;
 }
 
 .todo-input {
-  flex: 1;
   padding: 12px;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   font-size: 16px;
-  transition: all 0.2s;
 }
 
 .todo-input:focus {
@@ -245,10 +269,26 @@ onMounted(() => {
   box-shadow: 0 0 0 2px rgba(144, 202, 249, 0.3);
 }
 
-.loading {
-  text-align: center;
-  padding: 20px;
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
   color: #666;
+}
+
+.spinner {
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: #1e88e5;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+  margin-right: 10px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .todo-list {
@@ -271,13 +311,19 @@ onMounted(() => {
   background-color: #f1f3f5;
 }
 
+.todo-item.completed {
+  opacity: 0.7;
+}
+
 .todo-content {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 15px;
+  flex: 1;
 }
 
 .todo-checkbox {
+  margin-top: 3px;
   width: 18px;
   height: 18px;
   cursor: pointer;
@@ -291,16 +337,24 @@ onMounted(() => {
   font-size: 16px;
   font-weight: 500;
   margin-bottom: 5px;
+  word-break: break-word;
 }
 
 .todo-text p {
   font-size: 14px;
   color: #666;
+  margin-bottom: 5px;
 }
 
-.completed {
-  text-decoration: line-through;
+.todo-text small {
+  font-size: 12px;
   color: #999;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #757575;
 }
 
 .btn {
@@ -310,6 +364,7 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.2s;
   border: none;
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -333,10 +388,5 @@ onMounted(() => {
 
 .btn-danger:hover {
   background-color: #d32f2f;
-}
-
-.btn-danger:disabled {
-  background-color: #ffcdd2;
-  cursor: not-allowed;
 }
 </style>

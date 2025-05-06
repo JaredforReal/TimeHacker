@@ -6,6 +6,10 @@ import { supabase } from '../supabase.js'
 const routes = [
   {
     path: '/',
+    redirect: '/login' // 默认重定向到 /login
+  },
+  {
+    path: '/login',
     name: 'login',
     component: Login
   },
@@ -30,7 +34,7 @@ router.beforeEach(async (to, from, next) => {
     
         // 需要认证但未登录
         if (to.meta.requiresAuth && !session) {
-            next('/')
+            next('/login')
         }
         // 已登录但访问登录页
         else if (to.name === 'login' && session) {
@@ -42,7 +46,7 @@ router.beforeEach(async (to, from, next) => {
         }
     } catch (error) {
         console.error('Error during route guard:', error)
-        next('/')
+        next('/login')
     }
 })
 

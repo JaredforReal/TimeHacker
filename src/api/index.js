@@ -5,11 +5,24 @@ const API_BASE_URL = import.meta.env.VITE_API_URL
 export const apiClient = {
   // 获取当前用户JWT
   async getAuthHeader() {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) throw new Error('未登录')
-    return {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log("Current session:", session) // 调试当前会话信息
+
+      if (!session) {
+        console.error("No active session found")
+        throw new Error('未登录')
+      }
+
+      console.log("Using access token:", session.access_token?.substring(0, 15) + "...") // 仅打印部分token以保护安全
+
+      return {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    } catch (error) {
+      console.error("Error getting auth header:", error)
+      throw new Error('获取认证信息失败')
     }
   },
 
@@ -19,18 +32,20 @@ export const apiClient = {
       const headers = await this.getAuthHeader()
       console.log('Fetching todos with headers:', headers)
 
-      const response = await fetch(`${API_BASE_URL}/todos`, { headers })
+      const response = await fetch(`${API_BASE_URL}/todos`, {
+        headers,
+      })
+
       if (!response.ok) {
-        // Try to get error details if available
         const errorText = await response.text()
         console.error('Error response:', errorText)
+        console.error('Response status:', response.status)
+        console.error('Response headers:', Object.fromEntries([...response.headers]))
 
         try {
-          // Try to parse as JSON if possible
           const errorData = JSON.parse(errorText)
           throw new Error(errorData.detail || `获取待办失败 (${response.status})`)
         } catch {
-          // If parsing fails, use the text or status code
           throw new Error(`获取待办失败: ${errorText || response.status}`)
         }
       }
@@ -43,6 +58,7 @@ export const apiClient = {
       throw error
     }
   },
+
 
   // 创建待办
   async createTodo(title, description = null) {
@@ -80,43 +96,85 @@ export const apiClient = {
 
   // 更新待办
   async updateTodo(id, updates) {
-    const headers = await this.getAuthHeader()
-    const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify(updates)
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.detail || '更新待办失败')
+    try {
+      const headers = await this.getAuthHeader()
+
+      const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(updates)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Update todo error response:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `更新待办失败 (${response.status})`)
+        } catch {
+          throw new Error(`更新待办失败: ${errorText || response.status}`)
+        }
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Error in updateTodo:', error)
+      throw error
     }
-    return await response.json()
   },
 
   // 删除待办
   async deleteTodo(id) {
-    const headers = await this.getAuthHeader()
-    const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
-      method: 'DELETE',
-      headers
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.detail || '删除待办失败')
+    try {
+      const headers = await this.getAuthHeader()
+
+      const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
+        method: 'DELETE',
+        headers
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Delete todo error response:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `删除待办失败 (${response.status})`)
+        } catch {
+          throw new Error(`删除待办失败: ${errorText || response.status}`)
+        }
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error in deleteTodo:', error)
+      throw error
     }
-    return true
   },
 
   // 检查服务健康状态
   async healthCheck() {
     try {
-      const healthEndpoint = `${API_BASE_URL}/api/`
-      console.log(`Checking API health at: ${healthEndpoint}`)
+      // Try the main API health check
+      console.log(`Checking API health at: ${API_BASE_URL}/api/`)
 
-      const response = await fetch(healthEndpoint)
+      const response = await fetch(`${API_BASE_URL}/api/`)
       if (!response.ok) {
         console.error(`API health check failed with status: ${response.status}`)
-        return { status: "error", message: `API服务不可用 (${response.status})` }
+
+        // Try the root health check
+        console.log(`Trying root health check at: ${API_BASE_URL}/`)
+        const rootResponse = await fetch(`${API_BASE_URL}/`)
+        if (!rootResponse.ok) {
+          return {
+            status: "error",
+            message: `API服务不可用 (${response.status})`
+          }
+        }
+
+        const rootData = await rootResponse.json()
+        return rootData
       }
 
       const data = await response.json()
@@ -124,7 +182,22 @@ export const apiClient = {
       return data
     } catch (error) {
       console.error("API connection error:", error)
-      return { status: "error", message: `无法连接到API服务: ${error.message}` }
+
+      // Try root endpoint as fallback
+      try {
+        const rootResponse = await fetch(`${API_BASE_URL}/`)
+        if (rootResponse.ok) {
+          const rootData = await rootResponse.json()
+          return rootData
+        }
+      } catch (e) {
+        console.error("Root API check also failed:", e)
+      }
+
+      return {
+        status: "error",
+        message: `无法连接到API服务: ${error.message}`
+      }
     }
   }
 }

@@ -18,10 +18,36 @@ const apiStatus = ref(null)
 // 初始化加载
 onMounted(async () => {
   try {
+    // 首先确保用户已登录
+    if (!userStore.user) {
+      await userStore.fetchUser()
+
+      // 如果仍未登录，跳转到登录页
+      if (!userStore.isAuthenticated) {
+        console.log("No authenticated user found, redirecting to login")
+        router.push('/login')
+        return
+      }
+    }
+
+    // 然后检查API健康状态
     await checkApiHealth()
+
+    // 最后加载待办事项
     await loadTodos()
   } catch (err) {
     error.value = `初始化失败: ${err.message}`
+    // 如果是认证错误，尝试刷新会话
+    if (err.message.includes('未登录') || err.message.includes('credentials')) {
+      const refreshed = await userStore.refreshSession()
+      if (refreshed) {
+        // 刷新成功，重试加载
+        await loadTodos()
+      } else {
+        // 刷新失败，跳转到登录页
+        router.push('/login')
+      }
+    }
   }
 })
 

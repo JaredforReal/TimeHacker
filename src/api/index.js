@@ -153,6 +153,122 @@ export const apiClient = {
     }
   },
 
+  // 保存番茄钟会话
+  async savePomodoro(session) {
+    try {
+      const headers = await this.getAuthHeader()
+
+      const response = await fetch(`${API_BASE_URL}/pomodoro/sessions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(session)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Save pomodoro error response:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `保存番茄钟失败 (${response.status})`)
+        } catch {
+          throw new Error(`保存番茄钟失败: ${errorText || response.status}`)
+        }
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Error in savePomodoro:', error)
+      throw error
+    }
+  },
+
+  // 获取番茄钟历史记录
+  async getPomodoroHistory() {
+    try {
+      const headers = await this.getAuthHeader()
+
+      const response = await fetch(`${API_BASE_URL}/pomodoro/sessions`, {
+        headers
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Get pomodoro history error:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `获取番茄钟历史失败 (${response.status})`)
+        } catch {
+          throw new Error(`获取番茄钟历史失败: ${errorText || response.status}`)
+        }
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Error in getPomodoroHistory:', error)
+      throw error
+    }
+  },
+
+  // 获取番茄钟设置
+  async getPomodoroSettings() {
+    try {
+      const headers = await this.getAuthHeader()
+
+      const response = await fetch(`${API_BASE_URL}/pomodoro/settings`, {
+        headers
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Get pomodoro settings error:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `获取番茄钟设置失败 (${response.status})`)
+        } catch {
+          throw new Error(`获取番茄钟设置失败: ${errorText || response.status}`)
+        }
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Error in getPomodoroSettings:', error)
+      throw error
+    }
+  },
+
+  // 保存番茄钟设置
+  async savePomodoroSettings(settings) {
+    try {
+      const headers = await this.getAuthHeader()
+
+      const response = await fetch(`${API_BASE_URL}/pomodoro/settings`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(settings)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Save pomodoro settings error:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `保存番茄钟设置失败 (${response.status})`)
+        } catch {
+          throw new Error(`保存番茄钟设置失败: ${errorText || response.status}`)
+        }
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Error in savePomodoroSettings:', error)
+      throw error
+    }
+  },
+
   // 检查服务健康状态
   async healthCheck() {
     try {

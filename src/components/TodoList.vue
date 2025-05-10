@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { apiClient } from '../api'
 
 const props = defineProps({
@@ -10,13 +10,52 @@ const props = defineProps({
 })
 
 // 状态管理
-const todos = ref(props.initialTodos)
+const todos = ref(props.initialTodos || [])
 const newTodoTitle = ref('')
 const newTodoDesc = ref('')
 const isLoading = ref(false)
 const error = ref(null)
 
 const emit = defineEmits(['error'])
+
+// 确保响应数据正确处理
+const processTodoData = (data) => {
+  if (!data) return [];
+  
+  // 确保数据是数组
+  if (!Array.isArray(data)) {
+    console.error('Expected array of todos, got:', data);
+    return [];
+  }
+  
+  // 验证每个todo项
+  return data.map(todo => {
+    // 确保必要字段存在
+    if (!todo.id || !todo.title) {
+      console.warn('Todo item missing required fields:', todo);
+    }
+    
+    // 确保日期格式正确
+    if (todo.created_at && !(todo.created_at instanceof Date)) {
+      try {
+        // 尝试转换日期字符串，但保留原始值
+        const dateObj = new Date(todo.created_at);
+        if (!isNaN(dateObj.getTime())) {
+          console.log(`Successfully parsed date: ${todo.created_at}`);
+        }
+      } catch (e) {
+        console.warn(`Invalid date format: ${todo.created_at}`, e);
+      }
+    }
+    
+    // 确保布尔值正确
+    if (typeof todo.is_completed !== 'boolean') {
+      todo.is_completed = Boolean(todo.is_completed);
+    }
+    
+    return todo;
+  });
+};
 
 // 添加新待办
 const handleAddTodo = async () => {
@@ -70,7 +109,9 @@ const refreshTodos = async () => {
   try {
     isLoading.value = true
     error.value = null
-    todos.value = await apiClient.fetchTodos()
+    const todoData = await apiClient.fetchTodos()
+    console.log('Fetched todos:', todoData)
+    todos.value = processTodoData(todoData)
   } catch (err) {
     error.value = `加载失败: ${err.message}`
     emit('error', error.value)
@@ -78,6 +119,13 @@ const refreshTodos = async () => {
     isLoading.value = false
   }
 }
+
+// 组件挂载时加载待办
+onMounted(() => {
+  if (!props.initialTodos || props.initialTodos.length === 0) {
+    refreshTodos()
+  }
+})
 
 // 导出方法以供父组件调用
 defineExpose({

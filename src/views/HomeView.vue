@@ -115,7 +115,6 @@ const goToProfile = () => {
             </div>
             <ul v-if="showMenu" class="dropdown">
               <li @click="goToProfile">个人资料</li>
-              <li @click="toggleMenu">历史记录</li>
               <li @click="handleLogout">退出登录</li>
             </ul>
           </div>

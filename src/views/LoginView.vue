@@ -29,8 +29,20 @@
             type="password"
             required
             minlength="6"
-            placeholder="请输入密码"
+            placeholder="至少6个字符"
           />
+        </div>
+
+        <div v-if="!isRegistering" class="remember-forgot">
+          <div class="remember-me">
+            <input
+              id="remember-me"
+              v-model="form.rememberMe"
+              type="checkbox"
+            />
+            <label for="remember-me">记住我</label>
+          </div>
+          <a href="#" class="forgot-password">忘记密码?</a>
         </div>
 
         <!-- 提交按钮 -->
@@ -80,6 +92,7 @@ const error = ref('');
 const form = ref({
   email: '',
   password: '',
+  rememberMe: false
 });
 
 // 切换登录/注册模式
@@ -230,6 +243,31 @@ const registerUser = async () => {
   outline: none;
   border-color: #90caf9;
   box-shadow: 0 0 0 2px rgba(144, 202, 249, 0.3);
+}
+
+/* 记住我 & 忘记密码 */
+.remember-forgot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.remember-me input {
+  width: 14px;
+  height: 14px;
+}
+.forgot-password {
+  color: #1e88e5;
+  font-size: 13px;
+  text-decoration: none;
+}
+.forgot-password:hover {
+  text-decoration: underline;
 }
 
 /* 提交按钮 */

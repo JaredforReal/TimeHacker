@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient } from '../api'
 import { useUserStore } from '../stores/user'
@@ -14,6 +14,13 @@ const isLoading = ref(false)
 const error = ref(null)
 const apiStatus = ref(null)
 const todos = ref([])
+const showMenu = ref(false)
+
+// 用户头像 URL
+const avatarUrl = computed(() => {
+  const username = userStore.user?.email ? userStore.user.email.split('@')[0] : ''
+  return `https://api.dicebear.com/9.x/avataaars/svg?seed=${username}&size=128&backgroundColor=transparent`
+})
 
 // 初始化加载
 onMounted(async () => {
@@ -80,6 +87,17 @@ const handleLogout = async () => {
 const handleLogin = () => {
   router.push('/login')
 }
+
+// 显示/隐藏菜单
+const toggleMenu = () => {
+  showMenu.value = !showMenu.value
+}
+
+// 跳转到个人资料页
+const goToProfile = () => {
+  router.push('/profile')
+  showMenu.value = false
+}
 </script>
 
 <template>
@@ -89,13 +107,17 @@ const handleLogin = () => {
       <div class="container">
         <div class="navbar-content">
           <h1 class="logo">TimeHacker</h1>
-          <button 
-            v-if="userStore.isAuthenticated" 
-            @click="handleLogout" 
-            class="btn btn-primary"
-          >
-            退出登录
-          </button>
+          <div v-if="userStore.isAuthenticated" class="user-info">
+            <div class="avatar-container" @click="toggleMenu">
+              <img :src="avatarUrl" alt="User Avatar" class="avatar">
+              <span class="username">{{ userStore.user.name }}</span>
+              <span class="dropdown-icon" :class="{ open: showMenu }">▼</span>
+            </div>
+            <ul v-if="showMenu" class="dropdown">
+              <li @click="goToProfile">个人资料</li>
+              <li @click="handleLogout">退出登录</li>
+            </ul>
+          </div>
           <button 
             v-else 
             @click="handleLogin" 
@@ -171,6 +193,111 @@ const handleLogin = () => {
   color: #333;
 }
 
+.user-info {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.avatar-container {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+.username {
+  font-size: 14px;
+  color: #333;
+}
+
+.dropdown-icon {
+  margin-left: 5px;
+  font-size: 12px;
+  transition: transform 0.3s;
+}
+
+.dropdown-icon.open {
+  transform: rotate(180deg);
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: #fff;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  list-style: none;
+  padding: 10px 0;
+  margin: 10px 0 0;
+  width: 200px;
+  z-index: 10;
+}
+
+.dropdown li {
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  display: flex;
+  align-items: center;
+}
+
+.dropdown li:hover {
+  background-color: #f5f5f5;
+}
+
+.dashboard {
+  margin-top: 20px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-item {
+  height: 100%;
+}
+
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background-color: #1e88e5;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #1976d2;
+}
+
+.btn-primary:disabled {
+  background-color: #90caf9;
+  cursor: not-allowed;
+}
+
 .main-content {
   flex: 1;
   padding: 40px 0;
@@ -216,49 +343,5 @@ const handleLogin = () => {
 .login-prompt p {
   margin-bottom: 25px;
   color: #666;
-}
-
-.dashboard {
-  margin-top: 20px;
-}
-
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-@media (max-width: 768px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.dashboard-item {
-  height: 100%;
-}
-
-.btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  white-space: nowrap;
-}
-
-.btn-primary {
-  background-color: #1e88e5;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #1976d2;
-}
-
-.btn-primary:disabled {
-  background-color: #90caf9;
-  cursor: not-allowed;
 }
 </style>

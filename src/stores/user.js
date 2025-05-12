@@ -47,6 +47,52 @@ export const useUserStore = defineStore('user', {
         console.error("Failed to refresh session:", error)
         return false
       }
+    },
+    
+    // 更新用户资料
+    // 这里的 profileData 应该包含用户的所有可更新信息
+    async updateProfile(profileData) {
+      try {
+        const { data, error } = await supabase.auth.updateUser({
+          email: profileData.email,
+          password: profileData.password || undefined,
+        });
+        if (error) throw error;
+
+        // 更新其他用户信息（如头像、姓名等）
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            name: profileData.name,
+            bio: profileData.bio,
+            school: profileData.school,
+            location: profileData.location,
+            avatar: profileData.avatar,
+          })
+          .eq('id', this.user.id);
+        if (updateError) throw updateError;
+
+        // 更新本地状态
+        this.user = { ...this.user, ...profileData };
+      } catch (error) {
+        console.error('Failed to update profile:', error);
+        throw error;
+      }
+    },
+
+    // 验证用户凭据
+    async verifyCredentials(email, password) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+        return true;
+      } catch (error) {
+        console.error('Failed to verify credentials:', error);
+        return false;
+      }
     }
   }
 })

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/LoginView.vue'
 import Home from '../views/HomeView.vue'
+import ProfileView from '../views/ProfileView.vue'
 import { supabase } from '../supabase.js'
 
 const routes = [
@@ -18,6 +19,11 @@ const routes = [
     name: 'home',
     component: Home,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile',
+    name: 'profile',
+    component: ProfileView,
   }
 ]
 

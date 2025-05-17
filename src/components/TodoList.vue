@@ -1,5 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import { ElDatePicker } from 'element-plus'
+import 'element-plus/dist/index.css'
 import { apiClient } from '../api'
 
 const props = defineProps({
@@ -13,10 +15,22 @@ const props = defineProps({
 const todos = ref(props.initialTodos || [])
 const newTodoTitle = ref('')
 const newTodoDesc = ref('')
+const newStartDate = ref('')
+const newEndDate = ref('')
 const isLoading = ref(false)
 const error = ref(null)
 
 const emit = defineEmits(['error'])
+
+// 日期选择配置
+const datePickerConfig = {
+  valueFormat: 'YYYY-MM-DD',
+  type: 'date',
+  placeholder: '请选择日期',
+  style: {
+    width: '100%'
+  }
+}
 
 // 确保响应数据正确处理
 const processTodoData = (data) => {
@@ -59,7 +73,10 @@ const processTodoData = (data) => {
 
 // 添加新待办
 const handleAddTodo = async () => {
-  if (!newTodoTitle.value.trim()) return
+  if (!newTodoTitle.value.trim()) {
+    alert('请输入任务标题')
+    return
+  }
   
   try {
     isLoading.value = true
@@ -68,8 +85,12 @@ const handleAddTodo = async () => {
       newTodoDesc.value.trim() || null
     )
     todos.value = [createdTodo, ...todos.value]
+    // 重置表单
     newTodoTitle.value = ''
     newTodoDesc.value = ''
+    newStartDate.value = ''
+    newEndDate.value = ''
+    showAddForm.value = false // 提交后隐藏表单
   } catch (err) {
     error.value = `添加失败: ${err.message}`
     emit('error', error.value)
@@ -131,34 +152,88 @@ onMounted(() => {
 defineExpose({
   refreshTodos
 })
+
+// 添加新的 ref 控制表单显示
+const showAddForm = ref(false)
+
+// 添加切换表单显示的方法
+const toggleAddForm = () => {
+  showAddForm.value = !showAddForm.value
+}
 </script>
 
 <template>
   <div class="todo-container">
     <h2 class="section-title">待办事项</h2>
+    
+    <!-- 添加任务按钮 -->
+    <button 
+      v-if="!showAddForm"
+      @click="toggleAddForm" 
+      class="btn btn-primary add-todo-btn"
+    >
+      添加新任务
+    </button>
+
     <!-- 添加待办表单 -->
-    <div class="todo-form">
+    <div v-if="showAddForm" class="todo-form">
       <input
         v-model="newTodoTitle"
         type="text"
         placeholder="任务标题"
         class="todo-input"
-        @keyup.enter="handleAddTodo"
       />
       <input
         v-model="newTodoDesc"
         type="text"
         placeholder="任务描述（可选）"
         class="todo-input"
-        @keyup.enter="handleAddTodo"
       />
-      <button 
-        @click="handleAddTodo" 
-        class="btn btn-primary"
-        :disabled="isLoading"
-      >
-        {{ isLoading ? '处理中...' : '添加任务' }}
-      </button>
+      <!-- 替换原来的日期选择器 -->
+      <el-date-picker
+        v-model="newStartDate"
+        :placeholder="'开始日期'"
+        class="todo-input date-picker"
+        :class="['date-picker']"
+        :style="datePickerConfig.style"
+        :type="datePickerConfig.type"
+        :value-format="datePickerConfig.valueFormat"
+      />
+      <el-date-picker
+        v-model="newEndDate"
+        :placeholder="'截止日期'"
+        class="todo-input date-picker"
+        :class="['date-picker']"
+        :style="datePickerConfig.style"
+        :type="datePickerConfig.type"
+        :value-format="datePickerConfig.valueFormat"
+        :min-date="newStartDate"
+      />
+      <input
+        type="text"
+        placeholder="优先级（可选）"
+        class="todo-input"
+      />
+      <input
+        type="text"
+        placeholder="标签（可选）"
+        class="todo-input"
+      />
+      <div class="form-buttons">
+        <button 
+          @click="handleAddTodo" 
+          class="btn btn-primary"
+          :disabled="isLoading"
+        >
+          {{ isLoading ? '添加中...' : '确认添加' }}
+        </button>
+        <button 
+          @click="toggleAddForm" 
+          class="btn btn-secondary"
+        >
+          取消
+        </button>
+      </div>
     </div>
 
     <!-- 加载状态 -->
@@ -206,6 +281,10 @@ defineExpose({
 </template>
 
 <style scoped>
+.add-todo-btn {
+  margin-bottom: 20px;
+}
+
 .todo-container {
   background: white;
   border-radius: 12px;
@@ -220,26 +299,103 @@ defineExpose({
   margin-bottom: 20px;
 }
 
-.todo-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 30px;
-}
-
-.todo-input {
-  padding: 12px;
+/* 统一输入框和日期选择器样式 */
+.todo-input,
+:deep(.el-input__wrapper) {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   font-size: 16px;
+  background-color: white;
+  transition: all 0.2s ease;
+  box-shadow: none !important;
 }
 
-.todo-input:focus {
-  outline: none;
+/* 输入框和日期选择器焦点样式 */
+.todo-input:focus,
+:deep(.el-input__wrapper.is-focus) {
   border-color: #90caf9;
-  box-shadow: 0 0 0 2px rgba(144, 202, 249, 0.3);
+  box-shadow: 0 0 0 1px #90caf9 !important;
+  outline: none;
 }
 
+/* 日期选择器内部输入框样式 */
+:deep(.el-input__inner) {
+  height: 40px;
+  font-size: 16px;
+  color: #333;
+}
+
+/* 移除之前的日期选择器样式 */
+.date-picker {
+  width: 100%;
+  margin: 0;
+  display: block;
+}
+
+/* 调整表单间距 */
+.todo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;  /* 增加默认间距 */
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+/* 为日期选择器添加特定样式 */
+:deep(.el-date-editor.el-input) {
+  margin-bottom: 10px; /* 添加底部间距 */
+  width: 100%;
+}
+
+/* 移除最后一个日期选择器的底部间距 */
+:deep(.el-date-editor.el-input:last-of-type) {
+  margin-bottom: 0;
+}
+
+/* 统一hover效果 */
+.todo-input:hover,
+:deep(.el-input__wrapper:hover) {
+  border-color: #90caf9;
+}
+
+/* 确保所有表单项之间的间距一致 */
+.todo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;  /* 默认间距设置为15px */
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+/* 移除日期选择器可能的默认边距 */
+:deep(.el-date-editor.el-input) {
+  margin: 0;
+  width: 100%;
+}
+
+/* 调整日期选择器的间距 */
+.todo-input.date-picker {
+  margin-bottom: 500px;
+}
+
+/* 确保最后一个日期选择器不会有多余的边距 */
+.todo-input.date-picker:last-of-type {
+  margin-bottom: 0;
+}
+
+/* 确保日期选择弹出框样式统一 */
+:deep(.el-picker__popper) {
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* 加载状态 */
 .loading-state {
   display: flex;
   align-items: center;
@@ -359,5 +515,35 @@ defineExpose({
 
 .btn-danger:hover {
   background-color: #d32f2f;
+}
+
+.btn-secondary {
+  background: gray;
+  color: white;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* 统一所有输入框的 placeholder 颜色 */
+.todo-input::placeholder {
+  color: #999;
+}
+
+:deep(.el-input__inner::placeholder) {
+  color: #999 !important;
+}
+
+/* 确保日期选择器的 placeholder 颜色也一致 */
+:deep(.el-input__placeholder) {
+  color: #999 !important;
+}
+
+/* 防止日期选择器在获得焦点时改变 placeholder 颜色 */
+:deep(.el-input.is-focus .el-input__placeholder) {
+  color: #999 !important;
 }
 </style>

@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
+    "@vuepic/vue-datepicker": "^11.0.2",
+    "element-plus": "^2.9.10",
     "pinia": "^3.0.2",
     "vue": "^3.5.13",
     "vue-router": "^4.5.1"

@@ -98,6 +98,13 @@ const goToProfile = () => {
   router.push('/profile')
   showMenu.value = false
 }
+
+// 日历相关
+const showCalendar = ref(false)
+const selectedDate = ref(new Date().toISOString().slice(0, 10))
+const toggleCalendar = () => {
+  showCalendar.value = !showCalendar.value
+}
 </script>
 
 <template>
@@ -106,7 +113,22 @@ const goToProfile = () => {
     <nav class="navbar">
       <div class="container">
         <div class="navbar-content">
+          <!-- 日历显示在左侧 -->
+          <div class="calendar-left">
+            <div class="calendar-btn">
+              📅
+            </div>
+            <span class="calendar-date">{{ selectedDate }}</span>
+            <!-- <div v-if="showCalendar" class="calendar-popup">
+              <input 
+                type="date" 
+                v-model="selectedDate"
+                @change="toggleCalendar"
+              />
+            </div> -->
+          </div>
           <h1 class="logo">TimeHacker</h1>
+          <!-- 原有用户信息/登录按钮 -->
           <div v-if="userStore.isAuthenticated" class="user-info">
             <div class="avatar-container" @click="toggleMenu">
               <img :src="avatarUrl" alt="User Avatar" class="avatar">
@@ -185,6 +207,40 @@ const goToProfile = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
+}
+
+.calendar-left {
+  display: flex;
+  align-items: center;
+  margin-right: 20px;
+}
+
+.calendar-btn {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 16px;
+  margin-right: 6px;
+}
+
+.calendar-date {
+  font-size: 15px;
+  color: #1976d2;
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.calendar-popup {
+  position: absolute;
+  top: 45px;
+  left: 0;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 20;
 }
 
 .logo {

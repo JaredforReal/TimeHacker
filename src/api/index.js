@@ -269,6 +269,136 @@ export const apiClient = {
     }
   },
 
+  // 获取个人资料
+  async fetchProfile() {
+    try {
+      const headers = await this.getAuthHeader()
+
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        headers,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Error fetching profile:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `获取个人资料失败 (${response.status})`)
+        } catch {
+          throw new Error(`获取个人资料失败: ${errorText || response.status}`)
+        }
+      }
+
+      const data = await response.json()
+      console.log('Profile fetched successfully:', data)
+      return data
+    } catch (error) {
+      console.error('Error in fetchProfile:', error)
+      throw error
+    }
+  },
+
+  // 更新个人资料
+  async updateProfile(profileData) {
+    try {
+      const headers = await this.getAuthHeader()
+
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(profileData)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Error updating profile:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `更新个人资料失败 (${response.status})`)
+        } catch {
+          throw new Error(`更新个人资料失败: ${errorText || response.status}`)
+        }
+      }
+
+      const data = await response.json()
+      console.log('Profile updated successfully:', data)
+      return data
+    } catch (error) {
+      console.error('Error in updateProfile:', error)
+      throw error
+    }
+  },
+
+  // 上传头像
+  async uploadAvatar(file) {
+    try {
+      // 使用FormData上传文件
+      const formData = new FormData()
+      formData.append('avatar', file)
+
+      const headers = await this.getAuthHeader()
+      // 对于FormData请求，不要手动设置Content-Type
+      delete headers['Content-Type']
+
+      const response = await fetch(`${API_BASE_URL}/profile/avatar`, {
+        method: 'POST',
+        headers,
+        body: formData
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Error uploading avatar:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `上传头像失败 (${response.status})`)
+        } catch {
+          throw new Error(`上传头像失败: ${errorText || response.status}`)
+        }
+      }
+
+      const data = await response.json()
+      console.log('Avatar uploaded successfully:', data)
+      return data
+    } catch (error) {
+      console.error('Error in uploadAvatar:', error)
+      throw error
+    }
+  },
+
+  // 密码重置请求
+  async requestPasswordReset(email) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Password reset request error:', errorText)
+
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.detail || `密码重置请求失败 (${response.status})`)
+        } catch {
+          throw new Error(`密码重置请求失败: ${errorText || response.status}`)
+        }
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error('Error in requestPasswordReset:', error)
+      throw error
+    }
+  },
+
   // 检查服务健康状态
   async healthCheck() {
     try {

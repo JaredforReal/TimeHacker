@@ -1,9 +1,14 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed} from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '../stores/user';
 import { supabase } from '../supabase.js';
 import { apiClient } from '../api/index.js';
+
+const defaultAvatarUrl = computed(() => {
+  const username = userStore.user?.email ? userStore.user.email.split('@')[0] : '';
+  return `https://api.dicebear.com/9.x/avataaars/svg?seed=${username}&size=128&backgroundColor=transparent`
+})
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -30,14 +35,16 @@ const loadProfile = async () => {
     isLoading.value = true;
     error.value = null;
     
-    const { data, error: fetchError } = await apiClient.fetchProfile();
+    const data = await apiClient.fetchProfile();
 
-    if (fetchError) throw fetchError;
+    if (!data) {
+      throw new Error('未找到用户数据');
+    }
 
     profileForm.value = {
       name: data.name || '',
       school: data.school || '',
-      avatar: data.avatar
+      avatar: data.avatar || defaultAvatarUrl.value,
     };
   } catch (err) {
     console.error('加载个人资料失败:', err);
@@ -50,24 +57,42 @@ const loadProfile = async () => {
 // 保存个人资料
 const saveProfile = async () => {
   try {
+    // 表单验证
+    if (!profileForm.value.name.trim()) {
+      error.value = '姓名不能为空';
+      return;
+    }
+    
     isLoading.value = true;
     error.value = null;
     
-    const { data, error: updateError } = await apiClient.updateProfile({
-      name: profileForm.value.name,
-      school: profileForm.value.school,
+    const data = await apiClient.updateProfile({
+      name: profileForm.value.name.trim(),
+      school: profileForm.value.school.trim(),
     });
 
-    if (updateError) throw updateError;
-
-    isEditing.value = false; // 退出编辑模式
-    successMessage.value = '个人资料已保存';
+    // 更新本地用户信息和表单数据
+    if (userStore.user) {
+      userStore.user.name = data.name;
+    }
+    
+    // 使用返回的数据更新表单
+    profileForm.value = {
+      name: data.name || '',
+      school: data.school || '',
+      avatar: data.avatar || profileForm.value.avatar
+    };
+    
+    isEditing.value = false;
+    successMessage.value = '个人资料已成功更新';
+    
+    // 自动关闭成功消息
     setTimeout(() => {
       successMessage.value = null;
     }, 3000);
   } catch (err) {
     console.error('保存个人资料失败:', err);
-    error.value = '保存失败，请重试';
+    error.value = err.message || '保存失败，请稍后重试';
   } finally {
     isLoading.value = false;
   }
@@ -193,10 +218,10 @@ onMounted(async () => {
     <div class="profile-content">
       <div class="avatar-section">
         <img 
-          :src="profileForm.avatar" 
+          :src="profileForm.avatar || defaultAvatarUrl" 
           alt="Avatar" 
           class="avatar" 
-          @error="profileForm.avatar = 'https://via.placeholder.com/100'" 
+          @error="(e) => { e.target.src = defaultAvatarUrl }" 
         />
         <label v-if="isEditing" class="avatar-upload">
           更换头像

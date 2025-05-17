@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/LoginView.vue'
 import Home from '../views/HomeView.vue'
 import ProfileView from '../views/ProfileView.vue'
+import ResetPasswordView from '../views/ResetPasswordView.vue'
 import { supabase } from '../supabase.js'
 
 const routes = [
@@ -24,6 +25,11 @@ const routes = [
     path: '/profile',
     name: 'profile',
     component: ProfileView,
+  },
+  {
+    path: '/reset-password',
+    name: 'reset-password',
+    component: ResetPasswordView
   }
 ]
 
@@ -38,8 +44,8 @@ router.beforeEach(async (to, from, next) => {
     // 获取当前会话
     const { data: { session } } = await supabase.auth.getSession()
 
-    // 需要认证但未登录
-    if (to.meta.requiresAuth && !session) {
+    // 需要认证但未登录 (排除home页面)
+    if (to.meta.requiresAuth && !session && to.name !== 'home') {
       next('/login')
     }
     // 已登录但访问登录页

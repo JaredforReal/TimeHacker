@@ -133,14 +133,14 @@ const goToProfile = () => {
     <main class="main-content">
       <div class="container">
         <!-- API状态显示 -->
-        <div v-if="apiStatus" class="api-status">
+        <!-- <div v-if="apiStatus" class="api-status">
           后端状态: {{ apiStatus.status }} - {{ apiStatus.message }}
-        </div>
+        </div> -->
 
         <!-- 错误提示 -->
-        <div v-if="error" class="error-message">
+        <!-- <div v-if="error" class="error-message">
           {{ error }}
-        </div>
+        </div> -->
 
         <!-- 如果未登录，显示提示 -->
         <div v-if="!userStore.isAuthenticated" class="login-prompt">

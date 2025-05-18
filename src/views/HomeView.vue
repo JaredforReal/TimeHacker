@@ -1,10 +1,11 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient } from '../api'
 import { useUserStore } from '../stores/user'
 import TodoList from '../components/TodoList.vue'
 import PomodoroTimer from '../components/PomodoroTimer.vue'
+import Calendar from '../components/Calendar.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -15,6 +16,7 @@ const error = ref(null)
 const apiStatus = ref(null)
 const todos = ref([])
 const showMenu = ref(false)
+const showCalendar = ref(false)
 
 // 用户头像 URL
 const avatarUrl = computed(() => {
@@ -99,12 +101,22 @@ const goToProfile = () => {
   showMenu.value = false
 }
 
-// 日历相关
-const showCalendar = ref(false)
-const selectedDate = ref(new Date().toISOString().slice(0, 10))
-const toggleCalendar = () => {
-  showCalendar.value = !showCalendar.value
+// 添加点击外部关闭菜单的处理函数
+const handleClickOutside = (event) => {
+  const dropdown = document.querySelector('.user-info')
+  if (dropdown && !dropdown.contains(event.target) && showMenu.value) {
+    showMenu.value = false
+  }
 }
+
+// 添加生命周期钩子
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <template>
@@ -128,23 +140,28 @@ const toggleCalendar = () => {
             </div> -->
           </div>
           <h1 class="logo">TimeHacker</h1>
-          <!-- 原有用户信息/登录按钮 -->
+          <!-- 日历按钮 -->
+          <button @click="showCalendar = true" class="calendar-btn">
+            <span class="calendar-icon">📅</span>
+            日历
+          </button>
+          <!-- 用户信息/登录按钮 -->
           <div v-if="userStore.isAuthenticated" class="user-info">
-            <div class="avatar-container" @click="toggleMenu">
+            <div class="avatar-container" @click.stop="toggleMenu">
               <img :src="avatarUrl" alt="User Avatar" class="avatar">
               <span class="username">{{ userStore.user.name }}</span>
               <span class="dropdown-icon" :class="{ open: showMenu }">▼</span>
             </div>
-            <ul v-if="showMenu" class="dropdown">
+
+            <Transition name="dropdown">
+              <ul v-if="showMenu" class="dropdown">
               <li @click="goToProfile">个人资料</li>
               <li @click="handleLogout">退出登录</li>
             </ul>
+            </Transition>
+            
           </div>
-          <button 
-            v-else 
-            @click="handleLogin" 
-            class="btn btn-primary"
-          >
+          <button v-else @click="handleLogin" class="btn btn-primary">
             登录
           </button>
         </div>
@@ -152,6 +169,7 @@ const toggleCalendar = () => {
     </nav>
 
     <!-- 主内容区 -->
+    <Calendar v-if="showCalendar" @close="showCalendar = false" />
     <main class="main-content">
       <div class="container">
         <!-- API状态显示 -->
@@ -174,15 +192,8 @@ const toggleCalendar = () => {
         <!-- 已登录时显示主要功能区 -->
         <div v-else class="dashboard">
           <div class="dashboard-grid">
-            <TodoList 
-              :initialTodos="todos" 
-              @error="handleComponentError"
-              class="dashboard-item"
-            />
-            <PomodoroTimer 
-              @error="handleComponentError" 
-              class="dashboard-item"
-            />
+            <TodoList :initialTodos="todos" @error="handleComponentError" class="dashboard-item" />
+            <PomodoroTimer @error="handleComponentError" class="dashboard-item" />
           </div>
         </div>
       </div>
@@ -399,5 +410,16 @@ const toggleCalendar = () => {
 .login-prompt p {
   margin-bottom: 25px;
   color: #666;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

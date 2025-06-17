@@ -1,7 +1,5 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { ElDatePicker } from 'element-plus'
-import 'element-plus/dist/index.css'
 import { apiClient } from '../api'
 
 const props = defineProps({
@@ -21,16 +19,6 @@ const isLoading = ref(false)
 const error = ref(null)
 
 const emit = defineEmits(['error'])
-
-// 日期选择配置
-const datePickerConfig = {
-  valueFormat: 'YYYY-MM-DD',
-  type: 'date',
-  placeholder: '请选择日期',
-  style: {
-    width: '100%'
-  }
-}
 
 // 确保响应数据正确处理
 const processTodoData = (data) => {
@@ -190,24 +178,18 @@ const toggleAddForm = () => {
         class="todo-input"
       />
       <!-- 替换原来的日期选择器 -->
-      <el-date-picker
+      <input
         v-model="newStartDate"
-        :placeholder="'开始日期'"
+        type="date"
+        placeholder="开始日期"
         class="todo-input date-picker"
-        :class="['date-picker']"
-        :style="datePickerConfig.style"
-        :type="datePickerConfig.type"
-        :value-format="datePickerConfig.valueFormat"
       />
-      <el-date-picker
+      <input
         v-model="newEndDate"
-        :placeholder="'截止日期'"
+        type="date"
+        placeholder="截止日期"
         class="todo-input date-picker"
-        :class="['date-picker']"
-        :style="datePickerConfig.style"
-        :type="datePickerConfig.type"
-        :value-format="datePickerConfig.valueFormat"
-        :min-date="newStartDate"
+        :min="newStartDate"
       />
       <input
         type="text"

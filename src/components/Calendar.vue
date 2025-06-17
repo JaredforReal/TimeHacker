@@ -1,107 +1,14 @@
 <template>
-    <div class="calendar-overlay" @click.self="$emit('close')">
-        <div class="calendar-modal">
-            <!-- 左侧面板 -->
-            <div class="left-panel">
-                <!-- 创建任务按钮/表单 -->
-                <div class="create-task-section" :class="{ 'expanded': showTaskForm }">
-                    <button v-if="!showTaskForm" @click="showTaskForm = true" class="create-task-btn">
-                        <span class="plus-icon">+</span> 创建任务
-                    </button>
-                    <div v-else class="task-form">
-                        <div class="form-header">
-                            <h3 class="panel-title">创建任务</h3>
-                            <button @click="showTaskForm = false" class="close-form-btn">×</button>
-                        </div>
-                        <form @submit.prevent="addTask">
-                            <input v-model="taskTitle" placeholder="任务标题" required class="form-input" />
-
-                            <!-- 时间选择器组 -->
-                            <div class="time-picker-group">
-                                <div class="time-picker">
-                                    <input type="datetime-local" v-model="taskStart" required class="form-input" />
-                                    <button type="button" @click="confirmTime('start')" class="confirm-time-btn">
-                                        确定
-                                    </button>
-                                </div>
-                                <div class="time-picker">
-                                    <input type="datetime-local" v-model="taskEnd" required class="form-input" />
-                                    <button type="button" @click="confirmTime('end')" class="confirm-time-btn">
-                                        确定
-                                    </button>
-                                </div>
-                            </div>
-
-                            <!-- 颜色选择器 -->
-                            <div class="color-picker">
-                                <span class="color-label">任务颜色:</span>
-                                <div class="color-options">
-                                    <div v-for="color in taskColors" :key="color"
-                                        :class="['color-option', { selected: selectedColor === color }]"
-                                        :style="{ backgroundColor: color }" @click="selectedColor = color">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button type="submit" class="submit-btn">添加任务</button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- 小日历 -->
-                <div class="mini-calendar" :class="{ 'pushed-down': showTaskForm }">
-                    <div class="calendar-header">
-                        <button @click="previousMonth" class="nav-btn">&lt;</button>
-                        <span class="month-year">{{ currentMonthYear }}</span>
-                        <button @click="nextMonth" class="nav-btn">&gt;</button>
-                    </div>
-                    <div class="weekdays">
-                        <span v-for="day in ['日', '一', '二', '三', '四', '五', '六']" :key="day" class="weekday">
-                            {{ day }}
-                        </span>
-                    </div>
-                    <div class="days">
-                        <div v-for="day in calendarDays" :key="day.date" class="day" :class="{
-                            'current': isCurrentDay(day),
-                            'selected': isSelectedDay(day),
-                            'other-month': !day.isCurrentMonth
-                        }" @click="selectDay(day)">
-                            {{ day.dayNumber }}
-                            <div class="day-events" v-if="getDayEvents(day).length">
-                                <div v-for="event in getDayEvents(day)" :key="event.id" class="day-event-dot"
-                                    :style="{ backgroundColor: event.color }">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 当天任务列表 -->
-                <div class="day-events-list">
-                    <h4 class="list-title">{{ selectedDateStr }}的任务</h4>
-                    <div class="events-container">
-                        <div v-for="event in selectedDateEvents" :key="event.id" class="event-item"
-                            :style="{ borderLeftColor: event.color }">
-                            <span class="event-time">
-                                {{ formatEventTime(event) }}
-                            </span>
-                            <span class="event-title">{{ event.title }}</span>
-                            <button @click="deleteEvent(event)" class="delete-event-btn">
-                                ×
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 右侧日历面板 -->
-            <div class="calendar-panel">
-                <FullCalendar ref="calendarRef" :options="calendarOptions" />
-            </div>
-            <!-- 事件编辑弹窗 -->
-            <div v-if="editingEvent" class="event-popup-overlay" @click.self="closeEventPopup">
-                <div class="event-popup" :style="popupPosition">
-                    <!-- 标题行 -->
+    <div class="calendar-container">
+        <!-- 日历面板 -->
+        <div class="calendar-panel">
+            <FullCalendar ref="calendarRef" :options="calendarOptions" />
+        </div>
+        
+        <!-- 事件编辑弹窗 -->
+        <div v-if="editingEvent" class="event-popup-overlay" @click.self="closeEventPopup">
+            <div class="event-popup" :style="popupPosition">
+                <!-- 标题行 -->
                 <div class="popup-header">
                     <div class="color-indicator" :style="{ backgroundColor: editingEvent.color }"></div>
                     <input v-model="editingEvent.title" class="title-input" :placeholder="editingEvent.title || '无标题'"
@@ -115,18 +22,17 @@
 
                 <!-- 工具栏 -->
                 <div class="popup-toolbar">
-                    <div class="popup-toolbar">
-                        <button class="toolbar-btn edit-btn" @click="toggleEditMode">
-                            <span class="material-icon">✏️</span>
-                        </button>
-                        <button class="toolbar-btn delete-btn" @click="handleDelete">
-                            <span class="material-icon">🗑️</span>
-                        </button>
-                        <button class="toolbar-btn close-btn" @click="closeEventPopup">
-                            <span class="material-icon">✕</span>
-                        </button>
-                    </div>
+                    <button class="toolbar-btn edit-btn" @click="toggleEditMode">
+                        <span class="material-icon">✏️</span>
+                    </button>
+                    <button class="toolbar-btn delete-btn" @click="handleDelete">
+                        <span class="material-icon">🗑️</span>
+                    </button>
+                    <button class="toolbar-btn close-btn" @click="closeEventPopup">
+                        <span class="material-icon">✕</span>
+                    </button>
                 </div>
+                
                 <!-- 添加编辑模式内容 -->
                 <div v-if="isEditing" class="edit-panel">
                     <input v-model="editingEvent.title" class="edit-title-input" placeholder="任务标题" />
@@ -146,7 +52,6 @@
                         <button class="cancel-btn" @click="isEditing = false">取消</button>
                     </div>
                 </div>
-            </div>
             </div>
         </div>
     </div>
@@ -201,6 +106,14 @@ const calendarOptions = ref({
         left: 'prev,next today',
         center: 'title',
         right: 'dayGridMonth,timeGridWeek,timeGridDay'
+    },
+    buttonText: {
+        today: '今日',
+        month: '月',
+        week: '周',
+        day: '日',
+        prev: '上一个',
+        next: '下一个'
     },
     slotMinTime: '01:00:00',
     slotMaxTime: '23:00:00',
@@ -443,6 +356,20 @@ function handleDelete() {
 </script>
 
 <style scoped>
+.calendar-container {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.calendar-panel {
+    flex: 1;
+    min-height: 600px;
+}
 .event-popup-overlay {
     position: fixed;
     top: 0;

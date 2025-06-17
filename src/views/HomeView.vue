@@ -16,7 +16,6 @@ const error = ref(null)
 const apiStatus = ref(null)
 const todos = ref([])
 const showMenu = ref(false)
-const showCalendar = ref(false)
 
 // 用户头像 URL
 const avatarUrl = computed(() => {
@@ -140,11 +139,6 @@ onUnmounted(() => {
             </div> -->
           </div>
           <h1 class="logo">TimeHacker</h1>
-          <!-- 日历按钮 -->
-          <button @click="showCalendar = true" class="calendar-btn">
-            <span class="calendar-icon">📅</span>
-            日历
-          </button>
           <!-- 用户信息/登录按钮 -->
           <div v-if="userStore.isAuthenticated" class="user-info">
             <div class="avatar-container" @click.stop="toggleMenu">
@@ -169,7 +163,6 @@ onUnmounted(() => {
     </nav>
 
     <!-- 主内容区 -->
-    <Calendar v-if="showCalendar" @close="showCalendar = false" />
     <main class="main-content">
       <div class="container">
         <!-- API状态显示 -->
@@ -192,8 +185,11 @@ onUnmounted(() => {
         <!-- 已登录时显示主要功能区 -->
         <div v-else class="dashboard">
           <div class="dashboard-grid">
-            <TodoList :initialTodos="todos" @error="handleComponentError" class="dashboard-item" />
-            <PomodoroTimer @error="handleComponentError" class="dashboard-item" />
+            <div class="left-column">
+              <TodoList :initialTodos="todos" @error="handleComponentError" class="dashboard-item" />
+              <PomodoroTimer @error="handleComponentError" class="dashboard-item" />
+            </div>
+            <Calendar class="dashboard-item calendar-item" />
           </div>
         </div>
       </div>
@@ -327,13 +323,35 @@ onUnmounted(() => {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 2fr;
   gap: 20px;
+}
+
+.left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.calendar-item {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr 1.5fr;
+  }
 }
 
 @media (max-width: 768px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .calendar-item {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
 
@@ -372,9 +390,9 @@ onUnmounted(() => {
 
 .container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 15px;
 }
 
 .api-status {

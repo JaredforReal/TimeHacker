@@ -80,17 +80,15 @@ const handleAddTodo = async () => {
   
   try {
     isLoading.value = true
-    const createdTodo = await apiClient.createTodo(
+    await apiClient.createTodo(
       newTodoTitle.value.trim(),
       newTodoDesc.value.trim() || null
     )
-    todos.value = [createdTodo, ...todos.value]
-    // 重置表单
+    // 清空输入框
     newTodoTitle.value = ''
     newTodoDesc.value = ''
-    newStartDate.value = ''
-    newEndDate.value = ''
-    showAddForm.value = false // 提交后隐藏表单
+    // 重新获取最新的任务列表以确保数据一致性
+    await refreshTodos()
   } catch (err) {
     error.value = `添加失败: ${err.message}`
     emit('error', error.value)
@@ -105,7 +103,8 @@ const toggleComplete = async (todo) => {
     await apiClient.updateTodo(todo.id, {
       is_completed: !todo.is_completed
     })
-    todo.is_completed = !todo.is_completed
+    // 重新获取最新数据以确保一致性
+    await refreshTodos()
   } catch (err) {
     error.value = `更新失败: ${err.message}`
     emit('error', error.value)
@@ -118,7 +117,8 @@ const handleDelete = async (id) => {
   
   try {
     await apiClient.deleteTodo(id)
-    todos.value = todos.value.filter(t => t.id !== id)
+    // 重新获取最新数据以确保一致性
+    await refreshTodos()
   } catch (err) {
     error.value = `删除失败: ${err.message}`
     emit('error', error.value)

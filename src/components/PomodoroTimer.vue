@@ -261,170 +261,171 @@ const switchMode = (mode) => {
   <div class="pomodoro-container">
     <h2 class="section-title">
       番茄时钟
-      <button @click="openSettings" class="settings-btn" title="设置">
-        <i class="fas fa-cog"></i>
-        ⚙️
-      </button>
-    </h2>
-    
-    <!-- 错误提示 -->
-    <div v-if="error" class="error-message">
-      {{ error }}
-    </div>
-    
-    <!-- 设置面板 -->
-    <div v-if="showSettings" class="settings-panel">
-      <h3>定制你的番茄钟</h3>
-      <div class="setting-item">
-        <label>工作时间（分钟）</label>
-        <input 
-          type="number" 
-          v-model.number="editSettings.workTime" 
-          min="1" 
-          max="120"
-        />
-      </div>
-      <div class="setting-item">
-        <label>短休息时间（分钟）</label>
-        <input 
-          type="number" 
-          v-model.number="editSettings.shortBreakTime" 
-          min="1" 
-          max="30"
-        />
-      </div>
-      <div class="setting-item">
-        <label>长休息时间（分钟）</label>
-        <input 
-          type="number" 
-          v-model.number="editSettings.longBreakTime" 
-          min="1" 
-          max="60"
-        />
-      </div>
-      <div class="setting-item">
-        <label>长休息间隔（番茄钟数）</label>
-        <input 
-          type="number" 
-          v-model.number="editSettings.sessionsUntilLongBreak" 
-          min="1" 
-          max="10"
-        />
-      </div>
-      <div class="settings-actions">
-        <button @click="saveSettings" class="btn btn-primary" :disabled="isLoading">
-          {{ isLoading ? '保存中...' : '保存设置' }}
+      <div class="header-controls">
+        <button @click="openSettings" class="settings-btn" title="设置">
+          ⚙️
         </button>
-        <button @click="closeSettings" class="btn btn-secondary">取消</button>
       </div>
-    </div>
-    
-    <!-- 模式切换标签 -->
-    <div class="mode-tabs" v-if="!showSettings">
-      <button 
-        @click="switchMode('work')" 
-        :class="['mode-tab', currentMode === 'work' ? 'active' : '']"
-      >
-        工作
-      </button>
-      <button 
-        @click="switchMode('shortBreak')" 
-        :class="['mode-tab', currentMode === 'shortBreak' ? 'active' : '']"
-      >
-        短休息
-      </button>
-      <button 
-        @click="switchMode('longBreak')" 
-        :class="['mode-tab', currentMode === 'longBreak' ? 'active' : '']"
-      >
-        长休息
-      </button>
-    </div>
-    
-    <!-- 任务标题输入（仅工作模式显示） -->
-    <div v-if="currentMode === 'work' && !showSettings" class="task-input">
-      <input
-        v-model="timerTitle"
-        type="text"
-        placeholder="你正在做什么？（必填）"
-        :disabled="timerState !== 'stopped'"
-      />
-    </div>
-    
-    <!-- 计时器显示 -->
-    <div class="timer-display" v-if="!showSettings">
-      <div class="timer-circle" :style="`--progress: ${progress}%`">
-        <div class="time">{{ formattedTime }}</div>
+    </h2>
+      
+      <!-- 错误提示 -->
+      <div v-if="error" class="error-message">
+        {{ error }}
       </div>
-    </div>
-    
-    <!-- 控制按钮 -->
-    <div class="timer-controls" v-if="!showSettings">
-      <button 
-        v-if="timerState === 'stopped'" 
-        @click="startTimer" 
-        class="btn btn-primary"
-      >
-        开始
-      </button>
-      <button 
-        v-else-if="timerState === 'running'" 
-        @click="pauseTimer" 
-        class="btn btn-warning"
-      >
-        暂停
-      </button>
-      <button 
-        v-else 
-        @click="startTimer" 
-        class="btn btn-primary"
-      >
-        继续
-      </button>
-      <button 
-        v-if="timerState !== 'stopped'" 
-        @click="resetTimer" 
-        class="btn btn-secondary"
-      >
-        重置
-      </button>
-    </div>
-    
-    <!-- 进度指示 -->
-    <div class="progress-container" v-if="!showSettings">
-      <div class="progress-bar" :style="`width: ${progress}%`"></div>
-    </div>
-    
-    <!-- 当前设置显示 -->
-    <div class="current-settings" v-if="!showSettings">
-      <div class="settings-info">
-        <span>工作: {{ settings.workTime }}分钟</span>
-        <span>短休息: {{ settings.shortBreakTime }}分钟</span>
-        <span>长休息: {{ settings.longBreakTime }}分钟</span>
-        <span>长休息间隔: {{ settings.sessionsUntilLongBreak }}个番茄钟</span>
-      </div>
-    </div>
-    
-    <!-- 会话历史 -->
-    <div class="session-history" v-if="!showSettings">
-      <h3>历史记录</h3>
-      <div class="history-list">
-        <div v-if="isLoading" class="loading-state">
-          <div class="spinner"></div>
-          加载中...
+      
+      <!-- 设置面板 -->
+      <div v-if="showSettings" class="settings-panel">
+        <h3>定制你的番茄钟</h3>
+        <div class="setting-item">
+          <label>工作时间（分钟）</label>
+          <input 
+            type="number" 
+            v-model.number="editSettings.workTime" 
+            min="1" 
+            max="120"
+          />
         </div>
-        <div v-else-if="timerHistory.length === 0" class="empty-history">
-          暂无番茄钟记录
+        <div class="setting-item">
+          <label>短休息时间（分钟）</label>
+          <input 
+            type="number" 
+            v-model.number="editSettings.shortBreakTime" 
+            min="1" 
+            max="30"
+          />
         </div>
-        <div v-else class="history-item" v-for="(item, index) in timerHistory" :key="index">
-          <div class="history-content">
-            <span class="history-title">{{ item.title }}</span>
-            <span class="history-time">{{ new Date(item.completedAt).toLocaleString() }}</span>
+        <div class="setting-item">
+          <label>长休息时间（分钟）</label>
+          <input 
+            type="number" 
+            v-model.number="editSettings.longBreakTime" 
+            min="1" 
+            max="60"
+          />
+        </div>
+        <div class="setting-item">
+          <label>长休息间隔（番茄钟数）</label>
+          <input 
+            type="number" 
+            v-model.number="editSettings.sessionsUntilLongBreak" 
+            min="1" 
+            max="10"
+          />
+        </div>
+        <div class="settings-actions">
+          <button @click="saveSettings" class="btn btn-primary" :disabled="isLoading">
+            {{ isLoading ? '保存中...' : '保存设置' }}
+          </button>
+          <button @click="closeSettings" class="btn btn-secondary">取消</button>
+        </div>
+      </div>
+      
+      <!-- 模式切换标签 -->
+      <div class="mode-tabs" v-if="!showSettings">
+        <button 
+          @click="switchMode('work')" 
+          :class="['mode-tab', currentMode === 'work' ? 'active' : '']"
+        >
+          工作
+        </button>
+        <button 
+          @click="switchMode('shortBreak')" 
+          :class="['mode-tab', currentMode === 'shortBreak' ? 'active' : '']"
+        >
+          短休息
+        </button>
+        <button 
+          @click="switchMode('longBreak')" 
+          :class="['mode-tab', currentMode === 'longBreak' ? 'active' : '']"
+        >
+          长休息
+        </button>
+      </div>
+      
+      <!-- 任务标题输入（仅工作模式显示） -->
+      <div v-if="currentMode === 'work' && !showSettings" class="task-input">
+        <input
+          v-model="timerTitle"
+          type="text"
+          placeholder="你正在做什么？（必填）"
+          :disabled="timerState !== 'stopped'"
+        />
+      </div>
+      
+      <!-- 计时器显示 -->
+      <div class="timer-display" v-if="!showSettings">
+        <div class="timer-circle" :style="`--progress: ${progress}%`">
+          <div class="time">{{ formattedTime }}</div>
+        </div>
+      </div>
+      
+      <!-- 控制按钮 -->
+      <div class="timer-controls" v-if="!showSettings">
+        <button 
+          v-if="timerState === 'stopped'" 
+          @click="startTimer" 
+          class="btn btn-primary"
+        >
+          开始
+        </button>
+        <button 
+          v-else-if="timerState === 'running'" 
+          @click="pauseTimer" 
+          class="btn btn-warning"
+        >
+          暂停
+        </button>
+        <button 
+          v-else 
+          @click="startTimer" 
+          class="btn btn-primary"
+        >
+          继续
+        </button>
+        <button 
+          v-if="timerState !== 'stopped'" 
+          @click="resetTimer" 
+          class="btn btn-secondary"
+        >
+          重置
+        </button>
+      </div>
+      
+      <!-- 进度指示 -->
+      <div class="progress-container" v-if="!showSettings">
+        <div class="progress-bar" :style="`width: ${progress}%`"></div>
+      </div>
+      
+      <!-- 当前设置显示 -->
+      <div class="current-settings" v-if="!showSettings">
+        <div class="settings-info">
+          <span>工作: {{ settings.workTime }}分钟</span>
+          <span>短休息: {{ settings.shortBreakTime }}分钟</span>
+          <span>长休息: {{ settings.longBreakTime }}分钟</span>
+          <span>长休息间隔: {{ settings.sessionsUntilLongBreak }}个番茄钟</span>
+        </div>
+      </div>
+      
+      <!-- 会话历史 -->
+      <div class="session-history" v-if="!showSettings">
+        <h3>历史记录</h3>
+        <div class="history-list">
+          <div v-if="isLoading" class="loading-state">
+            <div class="spinner"></div>
+            加载中...
           </div>
-          <span class="history-duration">{{ item.duration }} 分钟</span>
+          <div v-else-if="timerHistory.length === 0" class="empty-history">
+            暂无番茄钟记录
+          </div>
+          <div v-else class="history-item" v-for="(item, index) in timerHistory" :key="index">
+            <div class="history-content">
+              <span class="history-title">{{ item.title }}</span>
+              <span class="history-time">{{ new Date(item.completedAt).toLocaleString() }}</span>
+            </div>
+            <span class="history-duration">{{ item.duration }} 分钟</span>
+          </div>
         </div>
       </div>
-    </div>
   </div>
 </template>
 
@@ -432,8 +433,8 @@ const switchMode = (mode) => {
 .pomodoro-container {
   background: white;
   border-radius: 12px;
-  padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  padding: 20px;
 }
 
 .section-title {
@@ -446,18 +447,26 @@ const switchMode = (mode) => {
   align-items: center;
 }
 
+.header-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .settings-btn {
   background: none;
   border: none;
   font-size: 18px;
   cursor: pointer;
   color: #757575;
-  padding: 5px;
+  padding: 6px;
   transition: all 0.2s;
+  border-radius: 4px;
 }
 
 .settings-btn:hover {
   color: #1e88e5;
+  background-color: #f5f5f5;
   transform: rotate(30deg);
 }
 
@@ -723,5 +732,23 @@ const switchMode = (mode) => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .pomodoro-container.collapsed {
+    right: 5px;
+    width: 70px;
+  }
+  
+  .collapsed-time {
+    font-size: 12px;
+  }
+  
+  .btn-mini {
+    font-size: 14px;
+    width: 28px;
+    height: 28px;
+  }
 }
 </style>

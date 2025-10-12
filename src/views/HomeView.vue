@@ -1,10 +1,11 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiClient } from '../api'
 import { useUserStore } from '../stores/user'
 import TodoList from '../components/TodoList.vue'
 import PomodoroTimer from '../components/PomodoroTimer.vue'
+import Calendar from '../components/Calendar.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -98,6 +99,23 @@ const goToProfile = () => {
   router.push('/profile')
   showMenu.value = false
 }
+
+// 添加点击外部关闭菜单的处理函数
+const handleClickOutside = (event) => {
+  const dropdown = document.querySelector('.user-info')
+  if (dropdown && !dropdown.contains(event.target) && showMenu.value) {
+    showMenu.value = false
+  }
+}
+
+// 添加生命周期钩子
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <template>
@@ -106,23 +124,38 @@ const goToProfile = () => {
     <nav class="navbar">
       <div class="container">
         <div class="navbar-content">
+          <!-- 日历显示在左侧 -->
+          <div class="calendar-left">
+            <div class="calendar-btn">
+              📅
+            </div>
+            <span class="calendar-date">{{ selectedDate }}</span>
+            <!-- <div v-if="showCalendar" class="calendar-popup">
+              <input 
+                type="date" 
+                v-model="selectedDate"
+                @change="toggleCalendar"
+              />
+            </div> -->
+          </div>
           <h1 class="logo">TimeHacker</h1>
+          <!-- 用户信息/登录按钮 -->
           <div v-if="userStore.isAuthenticated" class="user-info">
-            <div class="avatar-container" @click="toggleMenu">
+            <div class="avatar-container" @click.stop="toggleMenu">
               <img :src="avatarUrl" alt="User Avatar" class="avatar">
               <span class="username">{{ userStore.user.name }}</span>
               <span class="dropdown-icon" :class="{ open: showMenu }">▼</span>
             </div>
-            <ul v-if="showMenu" class="dropdown">
+
+            <Transition name="dropdown">
+              <ul v-if="showMenu" class="dropdown">
               <li @click="goToProfile">个人资料</li>
               <li @click="handleLogout">退出登录</li>
             </ul>
+            </Transition>
+            
           </div>
-          <button 
-            v-else 
-            @click="handleLogin" 
-            class="btn btn-primary"
-          >
+          <button v-else @click="handleLogin" class="btn btn-primary">
             登录
           </button>
         </div>
@@ -152,15 +185,11 @@ const goToProfile = () => {
         <!-- 已登录时显示主要功能区 -->
         <div v-else class="dashboard">
           <div class="dashboard-grid">
-            <TodoList 
-              :initialTodos="todos" 
-              @error="handleComponentError"
-              class="dashboard-item"
-            />
-            <PomodoroTimer 
-              @error="handleComponentError" 
-              class="dashboard-item"
-            />
+            <div class="left-column">
+              <TodoList :initialTodos="todos" @error="handleComponentError" class="dashboard-item" />
+              <PomodoroTimer @error="handleComponentError" class="dashboard-item" />
+            </div>
+            <Calendar class="dashboard-item calendar-item" />
           </div>
         </div>
       </div>
@@ -185,6 +214,40 @@ const goToProfile = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
+}
+
+.calendar-left {
+  display: flex;
+  align-items: center;
+  margin-right: 20px;
+}
+
+.calendar-btn {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 16px;
+  margin-right: 6px;
+}
+
+.calendar-date {
+  font-size: 15px;
+  color: #1976d2;
+  font-weight: 500;
+  min-width: 100px;
+}
+
+.calendar-popup {
+  position: absolute;
+  top: 45px;
+  left: 0;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 8px;
+  padding: 10px;
+  z-index: 20;
 }
 
 .logo {
@@ -260,13 +323,35 @@ const goToProfile = () => {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 2fr;
   gap: 20px;
+}
+
+.left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.calendar-item {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr 1.5fr;
+  }
 }
 
 @media (max-width: 768px) {
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .calendar-item {
+    grid-column: 1;
+    grid-row: auto;
   }
 }
 
@@ -305,9 +390,9 @@ const goToProfile = () => {
 
 .container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 20px;
+  padding: 0 15px;
 }
 
 .api-status {
@@ -343,5 +428,16 @@ const goToProfile = () => {
 .login-prompt p {
   margin-bottom: 25px;
   color: #666;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

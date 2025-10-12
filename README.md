@@ -1,15 +1,29 @@
 # 前端开发说明：
 
-## 项目完成度与规划
+## 项目完成度与规划（更新）
 
-- **当前完成度**: Vue 3 + Vite 脚手架已就绪，Pinia/Supabase 完成登录态管理与和后端的待办、番茄钟、个人资料 API 对接，首页聚合了 `TodoList`、`PomodoroTimer`、`Calendar` 三大组件，基础路由守卫与密码重置流程串联成功。
-- **已知缺口**: `HomeView` 中引用了未定义的 `selectedDate` 等状态导致运行时报错；路由 `profile` 未受 `requiresAuth` 保护；错误/加载态提示大多注释掉；缺乏 Vitest/Cypress 等测试与 Storybook 级别的组件沉淀；构建产物未集成 CI、环境变量约束也未文档化。
-- **建议迭代**:
+- 当前完成度
 
-1. 补齐 `HomeView`、`Calendar` 等组件的状态管理与边界处理，统一错误与加载提示风格。
-2. 强化认证链路：在路由守卫与 `apiClient` 中对 401/403 做自动刷新或登出，引入统一的 API 拦截器与事件总线。
-3. 引入 Vitest 单测与 Cypress 端到端测试，覆盖登录、待办增删改查、番茄钟流程，并用 Mock Service Worker 脱离真实后端。
-4. 建立 UI 设计体系（例如 UnoCSS/Tailwind + Storybook），完善响应式布局、暗色主题及可访问性。
+  - Vue 3 + Vite 脚手架稳定；Pinia + Supabase 完成会话管理。
+  - 路由守卫已保护需要登录的页面（如 `profile`）。
+  - 中央化 API 客户端（`src/api/index.js`）：统一请求封装、错误解析，401/403 自动刷新 session 并重试。
+  - 首页聚合 `TodoList`、`PomodoroTimer`、`Calendar`，并通过事件完成「待办 ↔ 日历」编排；本地使用 `localStorage` 持久化待办日程，支持拖拽更新与删除。
+  - 个人资料页重构：资料读取/保存、头像上传、密码重置链路打通；样式去重。
+  - 测试与 CI：已引入 Vitest，补充了 API 客户端的单测；新增 GitHub Actions 工作流对前端进行测试与构建。
+
+- 已知缺口
+
+  - 本地开发命令偶发退出（`npm run dev` exit 1），需要定位 Vite/Supabase/env 加载的具体报错。
+  - Vitest 测试中对 `supabase` 的模块 mock 存在 hoist 问题（vi.mock 提前执行），需按 Vitest 推荐使用 `vi.hoisted` 和在导入被测模块前 `vi.stubEnv`。
+  - 日程仅本地持久化，尚未与后端同步，跨设备不可用。
+  - 组件级单测（`TodoList`/`Calendar`/`HomeView`）与 e2e 测试未覆盖；缺少统一通知/Toast 体系。
+
+- 下一步计划（短期）
+  1. 修复 Vitest 测试环境与 mock：在测试中使用 `vi.hoisted` 声明 mock 函数，并在导入 `apiClient` 前使用 `vi.stubEnv('VITE_API_URL', ...)`；必要时将 `API_BASE_URL` 读取改为惰性（调用时读取）。
+  2. 排查本地 dev 失败：检查 `.env`、`supabase.js` 初始化、Vite 插件与 Node 版本；增加开发期报错浮层与日志。
+  3. 增加组件/编排单测：覆盖 Home 的日程映射、拖拽更新、删除回写、异常提示；补充 stores 的边界用例。
+  4. 设计并实现「日程后端化」：新增后端日程表与 CRUD 接口，登录后进行本地缓存与服务器的双向同步。
+  5. 统一通知系统：引入轻量 Toast/Alert 组件，规范错误与成功提示文案与展现时机。
 
 ## 环境准备
 
@@ -30,6 +44,17 @@ npm install
 ```bash
 npm run dev
 ```
+
+运行测试：
+
+```bash
+npm run test
+```
+
+Vitest 小贴士：
+
+- 模块 mock 的工厂函数会被「提升」（hoist）到文件顶部执行；如需在 mock 中引用变量，请使用 `vi.hoisted(() => ({ ... }))` 先声明，再在 `vi.mock` 中使用。
+- 在导入被测模块前，使用 `vi.stubEnv('VITE_API_URL', 'https://api.example.com')` 或在源码中惰性读取 `import.meta.env`，避免构造时抓取到空的环境变量。
 
 ## 项目结构
 

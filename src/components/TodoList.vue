@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { apiClient } from '../api'
 
 const props = defineProps({
@@ -10,7 +10,7 @@ const props = defineProps({
 })
 
 // 状态管理
-const todos = ref(props.initialTodos || [])
+const todos = ref([])
 const newTodoTitle = ref('')
 const newTodoDesc = ref('')
 const newStartDate = ref('')
@@ -18,7 +18,13 @@ const newEndDate = ref('')
 const isLoading = ref(false)
 const error = ref(null)
 
-const emit = defineEmits(['error'])
+const emit = defineEmits([
+  'error',
+  'todo-created',
+  'todo-deleted',
+  'todo-status-changed',
+  'todos-refreshed'
+])
 
 // 确保响应数据正确处理
 const processTodoData = (data) => {
@@ -68,13 +74,22 @@ const handleAddTodo = async () => {
   
   try {
     isLoading.value = true
-    await apiClient.createTodo(
+    const createdTodo = await apiClient.createTodo(
       newTodoTitle.value.trim(),
       newTodoDesc.value.trim() || null
     )
+    emit('todo-created', {
+      todo: createdTodo,
+      schedule: {
+        start: newStartDate.value || null,
+        end: newEndDate.value || null
+      }
+    })
     // 清空输入框
     newTodoTitle.value = ''
     newTodoDesc.value = ''
+    newStartDate.value = ''
+    newEndDate.value = ''
     // 重新获取最新的任务列表以确保数据一致性
     await refreshTodos()
   } catch (err) {
@@ -88,9 +103,11 @@ const handleAddTodo = async () => {
 // 切换完成状态
 const toggleComplete = async (todo) => {
   try {
+    const nextStatus = !todo.is_completed
     await apiClient.updateTodo(todo.id, {
-      is_completed: !todo.is_completed
+      is_completed: nextStatus
     })
+    emit('todo-status-changed', { id: todo.id, isCompleted: nextStatus })
     // 重新获取最新数据以确保一致性
     await refreshTodos()
   } catch (err) {
@@ -105,6 +122,7 @@ const handleDelete = async (id) => {
   
   try {
     await apiClient.deleteTodo(id)
+    emit('todo-deleted', id)
     // 重新获取最新数据以确保一致性
     await refreshTodos()
   } catch (err) {
@@ -121,6 +139,7 @@ const refreshTodos = async () => {
     const todoData = await apiClient.fetchTodos()
     console.log('Fetched todos:', todoData)
     todos.value = processTodoData(todoData)
+    emit('todos-refreshed', todos.value)
   } catch (err) {
     error.value = `加载失败: ${err.message}`
     emit('error', error.value)
@@ -138,7 +157,16 @@ onMounted(() => {
 
 // 导出方法以供父组件调用
 defineExpose({
-  refreshTodos
+  refreshTodos,
+  openFormWithDates(startIso, endIso) {
+    showAddForm.value = true
+    if (startIso) {
+      newStartDate.value = startIso.slice(0, 10)
+    }
+    if (endIso) {
+      newEndDate.value = endIso.slice(0, 10)
+    }
+  }
 })
 
 // 添加新的 ref 控制表单显示
@@ -147,7 +175,21 @@ const showAddForm = ref(false)
 // 添加切换表单显示的方法
 const toggleAddForm = () => {
   showAddForm.value = !showAddForm.value
+  if (!showAddForm.value) {
+    newTodoTitle.value = ''
+    newTodoDesc.value = ''
+    newStartDate.value = ''
+    newEndDate.value = ''
+  }
 }
+
+watch(
+  () => props.initialTodos,
+  (next) => {
+    todos.value = processTodoData(next)
+  },
+  { immediate: true, deep: true }
+)
 </script>
 
 <template>
@@ -218,6 +260,10 @@ const toggleAddForm = () => {
       </div>
     </div>
 
+    <div v-if="error" class="error-banner">
+      {{ error }}
+    </div>
+
     <!-- 加载状态 -->
     <div v-if="isLoading" class="loading-state">
       <div class="spinner"></div>
@@ -272,6 +318,16 @@ const toggleAddForm = () => {
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.error-banner {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #ffebee;
+  color: #c62828;
+  border-left: 4px solid #ef5350;
+  border-radius: 6px;
+  font-size: 14px;
 }
 
 .section-title {

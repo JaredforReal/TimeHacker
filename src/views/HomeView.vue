@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { format } from 'date-fns'
 import { useRouter } from 'vue-router'
 import { apiClient } from '../api'
 import { useUserStore } from '../stores/user'
@@ -16,6 +17,13 @@ const error = ref(null)
 const apiStatus = ref(null)
 const todos = ref([])
 const showMenu = ref(false)
+const selectedDate = ref(new Date())
+const selectedDateLabel = computed(() => format(selectedDate.value, 'yyyy年MM月dd日'))
+const todoListRef = ref(null)
+const calendarEvents = ref([])
+
+const TODO_SCHEDULE_KEY = 'timehacker.todoSchedules'
+const todoScheduleMap = ref({})
 
 // 用户头像 URL
 const avatarUrl = computed(() => {
@@ -23,8 +31,101 @@ const avatarUrl = computed(() => {
   return `https://api.dicebear.com/9.x/avataaars/svg?seed=${username}&size=128&backgroundColor=transparent`
 })
 
+const ensureIsoDateTime = (value, time = '08:00:00') => {
+  if (!value) return null
+  if (value.includes('T')) return value
+  return `${value}T${time}`
+}
+
+const loadScheduleMap = () => {
+  if (typeof window === 'undefined') return
+  try {
+    const raw = window.localStorage.getItem(TODO_SCHEDULE_KEY)
+    todoScheduleMap.value = raw ? JSON.parse(raw) : {}
+  } catch (err) {
+    console.warn('Failed to load todo schedule cache', err)
+    todoScheduleMap.value = {}
+  }
+}
+
+const persistScheduleMap = () => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(
+      TODO_SCHEDULE_KEY,
+      JSON.stringify(todoScheduleMap.value)
+    )
+  } catch (err) {
+    console.warn('Failed to persist todo schedule cache', err)
+  }
+}
+
+const removeSchedule = (id) => {
+  if (!id || !todoScheduleMap.value[id]) return
+  const next = { ...todoScheduleMap.value }
+  delete next[id]
+  todoScheduleMap.value = next
+  persistScheduleMap()
+}
+
+const upsertSchedule = (id, schedule) => {
+  if (!id || !schedule || !schedule.start) {
+    removeSchedule(id)
+    return
+  }
+
+  const previous = todoScheduleMap.value[id] || {}
+
+  const normalized = {
+    ...previous,
+    start: ensureIsoDateTime(schedule.start || previous.start),
+    end: ensureIsoDateTime(
+      schedule.end || schedule.start || previous.end,
+      '18:00:00'
+    ),
+    allDay: schedule.allDay ?? previous.allDay
+  }
+
+  if (schedule.color) {
+    normalized.color = schedule.color
+  }
+
+  const next = { ...todoScheduleMap.value, [id]: normalized }
+  todoScheduleMap.value = next
+  persistScheduleMap()
+}
+
+const clearScheduleCache = () => {
+  todoScheduleMap.value = {}
+  calendarEvents.value = []
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(TODO_SCHEDULE_KEY)
+  }
+}
+
+const syncCalendarEvents = () => {
+  calendarEvents.value = todos.value
+    .map((todo) => {
+      const schedule = todoScheduleMap.value?.[todo.id]
+      if (!schedule || !schedule.start) {
+        return null
+      }
+
+      return {
+        id: todo.id,
+        title: todo.title,
+        start: schedule.start,
+        end: schedule.end || schedule.start,
+        color: schedule.color || (todo.is_completed ? '#90caf9' : '#4dabf7'),
+        allDay: schedule.allDay ?? (!schedule.start.includes('T'))
+      }
+    })
+    .filter(Boolean)
+}
+
 // 初始化加载
 onMounted(async () => {
+  loadScheduleMap()
   try {
     // 首先确保用户已登录
     if (!userStore.user) {
@@ -37,6 +138,7 @@ onMounted(async () => {
     // 如果已登录，加载待办事项
     if (userStore.isAuthenticated) {
       await loadTodos()
+      syncCalendarEvents()
     }
   } catch (err) {
     error.value = `初始化失败: ${err.message}`
@@ -62,6 +164,7 @@ const loadTodos = async () => {
     isLoading.value = true
     error.value = null
     todos.value = await apiClient.fetchTodos()
+    syncCalendarEvents()
   } catch (err) {
     error.value = `加载失败: ${err.message}`
   } finally {
@@ -74,10 +177,84 @@ const handleComponentError = (errorMsg) => {
   error.value = errorMsg
 }
 
+const handleTodosRefreshed = (updatedTodos) => {
+  todos.value = updatedTodos
+  error.value = null
+  syncCalendarEvents()
+}
+
+const handleTodoCreated = (payload) => {
+  error.value = null
+  if (!payload || !payload.todo?.id) return
+  const schedule = payload.schedule
+  if (schedule?.start) {
+    upsertSchedule(payload.todo.id, {
+      ...schedule,
+      allDay: schedule.allDay
+    })
+    syncCalendarEvents()
+  }
+}
+
+const handleTodoDeleted = (id) => {
+  error.value = null
+  removeSchedule(id)
+  todos.value = todos.value.filter((todo) => todo.id !== id)
+  syncCalendarEvents()
+}
+
+const handleTodoStatusChanged = ({ id, isCompleted }) => {
+  if (!id) return
+  error.value = null
+  todos.value = todos.value.map((todo) =>
+    todo.id === id ? { ...todo, is_completed: isCompleted } : todo
+  )
+  syncCalendarEvents()
+}
+
+const handleScheduleSelect = ({ start, end }) => {
+  if (start) {
+    selectedDate.value = new Date(start)
+  }
+  todoListRef.value?.openFormWithDates(start, end)
+}
+
+const handleScheduleRemoved = (id) => {
+  error.value = null
+  removeSchedule(id)
+  syncCalendarEvents()
+}
+
+const handleCalendarEventUpdated = async ({ id, title, start, end, color }) => {
+  if (!id) return
+  error.value = null
+  const normalizedSchedule = {
+    start,
+    end,
+    color
+  }
+  upsertSchedule(id, normalizedSchedule)
+
+  const existing = todos.value.find((todo) => todo.id === id)
+  if (title && existing && existing.title !== title) {
+    try {
+      await apiClient.updateTodo(id, { title })
+      todos.value = todos.value.map((todo) =>
+        todo.id === id ? { ...todo, title } : todo
+      )
+    } catch (err) {
+      error.value = `更新任务标题失败: ${err.message}`
+    }
+  }
+
+  syncCalendarEvents()
+}
+
 // 退出登录
 const handleLogout = async () => {
   try {
     await userStore.signOut()
+    clearScheduleCache()
     router.push('/login')
   } catch (err) {
     error.value = `退出失败: ${err.message}`
@@ -129,7 +306,7 @@ onUnmounted(() => {
             <div class="calendar-btn">
               📅
             </div>
-            <span class="calendar-date">{{ selectedDate }}</span>
+            <span class="calendar-date">{{ selectedDateLabel }}</span>
             <!-- <div v-if="showCalendar" class="calendar-popup">
               <input 
                 type="date" 
@@ -143,7 +320,7 @@ onUnmounted(() => {
           <div v-if="userStore.isAuthenticated" class="user-info">
             <div class="avatar-container" @click.stop="toggleMenu">
               <img :src="avatarUrl" alt="User Avatar" class="avatar">
-              <span class="username">{{ userStore.user.name }}</span>
+              <span class="username">{{ userStore.user?.name || userStore.user?.email }}</span>
               <span class="dropdown-icon" :class="{ open: showMenu }">▼</span>
             </div>
 
@@ -165,15 +342,17 @@ onUnmounted(() => {
     <!-- 主内容区 -->
     <main class="main-content">
       <div class="container">
-        <!-- API状态显示 -->
-        <!-- <div v-if="apiStatus" class="api-status">
+        <div
+          v-if="apiStatus"
+          class="api-status"
+          :class="{ 'api-status-error': apiStatus.status !== 'ok' }"
+        >
           后端状态: {{ apiStatus.status }} - {{ apiStatus.message }}
-        </div> -->
+        </div>
 
-        <!-- 错误提示 -->
-        <!-- <div v-if="error" class="error-message">
+        <div v-if="error" class="error-message">
           {{ error }}
-        </div> -->
+        </div>
 
         <!-- 如果未登录，显示提示 -->
         <div v-if="!userStore.isAuthenticated" class="login-prompt">
@@ -186,10 +365,25 @@ onUnmounted(() => {
         <div v-else class="dashboard">
           <div class="dashboard-grid">
             <div class="left-column">
-              <TodoList :initialTodos="todos" @error="handleComponentError" class="dashboard-item" />
+              <TodoList
+                ref="todoListRef"
+                :initialTodos="todos"
+                class="dashboard-item"
+                @error="handleComponentError"
+                @todo-created="handleTodoCreated"
+                @todo-deleted="handleTodoDeleted"
+                @todo-status-changed="handleTodoStatusChanged"
+                @todos-refreshed="handleTodosRefreshed"
+              />
               <PomodoroTimer @error="handleComponentError" class="dashboard-item" />
             </div>
-            <Calendar class="dashboard-item calendar-item" />
+            <Calendar
+              class="dashboard-item calendar-item"
+              :todo-events="calendarEvents"
+              @schedule-select="handleScheduleSelect"
+              @event-updated="handleCalendarEventUpdated"
+              @schedule-removed="handleScheduleRemoved"
+            />
           </div>
         </div>
       </div>
@@ -401,6 +595,12 @@ onUnmounted(() => {
   border-radius: 6px;
   margin-bottom: 20px;
   font-size: 14px;
+}
+
+.api-status-error {
+  background: #ffebee;
+  color: #c62828;
+  border-left: 4px solid #ef5350;
 }
 
 .error-message {

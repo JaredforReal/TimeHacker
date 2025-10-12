@@ -7,87 +7,135 @@ export const apiClient = {
   async getAuthHeader() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      console.log("Current session:", session) // 调试当前会话信息
 
       if (!session) {
-        console.error("No active session found")
         throw new Error('未登录')
       }
-
-      console.log("Using access token:", session.access_token?.substring(0, 15) + "...") // 仅打印部分token以保护安全
 
       return {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'
       }
     } catch (error) {
-      console.error("Error getting auth header:", error)
+      console.error('Error getting auth header:', error)
       throw new Error('获取认证信息失败')
     }
+  },
+
+  async refreshAuthSession() {
+    try {
+      const { data, error } = await supabase.auth.refreshSession()
+      if (error) {
+        console.error('Failed to refresh session:', error)
+        return null
+      }
+      return data?.session ?? null
+    } catch (error) {
+      console.error('Failed to refresh session:', error)
+      return null
+    }
+  },
+
+  async parseErrorResponse(response, fallbackMessage) {
+    const defaultMessage = fallbackMessage || `请求失败 (${response.status})`
+    const errorText = await response.text()
+
+    if (errorText) {
+      try {
+        const errorData = JSON.parse(errorText)
+        throw new Error(errorData.detail || defaultMessage)
+      } catch (parseError) {
+        throw new Error(`${defaultMessage}: ${errorText}`)
+      }
+    }
+
+    throw new Error(defaultMessage)
+  },
+
+  async request(path, options = {}, fallbackMessage) {
+    const {
+      method = 'GET',
+      body,
+      headers = {},
+      requiresAuth = true,
+      isFormData = false
+    } = options
+
+    let requestHeaders = { ...headers }
+    let requestBody = body
+
+    if (requiresAuth) {
+      const authHeaders = await this.getAuthHeader()
+      requestHeaders = { ...authHeaders, ...requestHeaders }
+    }
+
+    if (requestBody && !isFormData && !requestHeaders['Content-Type']) {
+      requestHeaders['Content-Type'] = 'application/json'
+    }
+
+    if (isFormData) {
+      delete requestHeaders['Content-Type']
+    }
+
+    const urlBase = API_BASE_URL || ''
+    const url = `${urlBase}${path}`
+
+    let response = await fetch(url, {
+      method,
+      headers: requestHeaders,
+      body: requestBody
+    })
+
+    if (requiresAuth && [401, 403].includes(response.status)) {
+      const session = await this.refreshAuthSession()
+      if (session?.access_token) {
+        requestHeaders['Authorization'] = `Bearer ${session.access_token}`
+        response = await fetch(url, {
+          method,
+          headers: requestHeaders,
+          body: requestBody
+        })
+      }
+    }
+
+    if (!response.ok) {
+      await this.parseErrorResponse(response, fallbackMessage)
+    }
+
+    if (response.status === 204) {
+      return null
+    }
+
+    const contentType = response.headers.get('Content-Type') || ''
+    if (contentType.includes('application/json')) {
+      return await response.json()
+    }
+
+    return await response.text()
   },
 
   // 获取所有待办
   async fetchTodos() {
     try {
-      const headers = await this.getAuthHeader()
-      console.log('Fetching todos with headers:', headers)
-
-      const response = await fetch(`${API_BASE_URL}/todos`, {
-        headers,
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error response:', errorText)
-        console.error('Response status:', response.status)
-        console.error('Response headers:', Object.fromEntries([...response.headers]))
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `获取待办失败 (${response.status})`)
-        } catch {
-          throw new Error(`获取待办失败: ${errorText || response.status}`)
-        }
-      }
-
-      const data = await response.json()
-      console.log('Todos fetched successfully:', data)
-      return data
+      return await this.request('/todos', {}, '获取待办失败')
     } catch (error) {
       console.error('Error in fetchTodos:', error)
       throw error
     }
   },
 
-
   // 创建待办
   async createTodo(title, description = null) {
     try {
-      const headers = await this.getAuthHeader()
       const payload = { title, description }
-      console.log('Creating todo with payload:', payload)
-
-      const response = await fetch(`${API_BASE_URL}/todos`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Create todo error response:', errorText, 'Status:', response.status)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `创建待办失败 (${response.status})`)
-        } catch {
-          throw new Error(`创建待办失败: ${errorText || response.status}`)
-        }
-      }
-
-      const data = await response.json()
-      console.log('Todo created successfully:', data)
-      return data
+      return await this.request(
+        '/todos',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        },
+        '创建待办失败'
+      )
     } catch (error) {
       console.error('Error in createTodo:', error)
       throw error
@@ -97,27 +145,14 @@ export const apiClient = {
   // 更新待办
   async updateTodo(id, updates) {
     try {
-      const headers = await this.getAuthHeader()
-
-      const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(updates)
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Update todo error response:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `更新待办失败 (${response.status})`)
-        } catch {
-          throw new Error(`更新待办失败: ${errorText || response.status}`)
-        }
-      }
-
-      return await response.json()
+      return await this.request(
+        `/todos/${id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(updates)
+        },
+        '更新待办失败'
+      )
     } catch (error) {
       console.error('Error in updateTodo:', error)
       throw error
@@ -127,25 +162,13 @@ export const apiClient = {
   // 删除待办
   async deleteTodo(id) {
     try {
-      const headers = await this.getAuthHeader()
-
-      const response = await fetch(`${API_BASE_URL}/todos/${id}`, {
-        method: 'DELETE',
-        headers
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Delete todo error response:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `删除待办失败 (${response.status})`)
-        } catch {
-          throw new Error(`删除待办失败: ${errorText || response.status}`)
-        }
-      }
-
+      await this.request(
+        `/todos/${id}`,
+        {
+          method: 'DELETE'
+        },
+        '删除待办失败'
+      )
       return true
     } catch (error) {
       console.error('Error in deleteTodo:', error)
@@ -156,27 +179,14 @@ export const apiClient = {
   // 保存番茄钟会话
   async savePomodoro(session) {
     try {
-      const headers = await this.getAuthHeader()
-
-      const response = await fetch(`${API_BASE_URL}/pomodoro/sessions`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(session)
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Save pomodoro error response:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `保存番茄钟失败 (${response.status})`)
-        } catch {
-          throw new Error(`保存番茄钟失败: ${errorText || response.status}`)
-        }
-      }
-
-      return await response.json()
+      return await this.request(
+        '/pomodoro/sessions',
+        {
+          method: 'POST',
+          body: JSON.stringify(session)
+        },
+        '保存番茄钟失败'
+      )
     } catch (error) {
       console.error('Error in savePomodoro:', error)
       throw error
@@ -186,25 +196,7 @@ export const apiClient = {
   // 获取番茄钟历史记录
   async getPomodoroHistory() {
     try {
-      const headers = await this.getAuthHeader()
-
-      const response = await fetch(`${API_BASE_URL}/pomodoro/sessions`, {
-        headers
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Get pomodoro history error:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `获取番茄钟历史失败 (${response.status})`)
-        } catch {
-          throw new Error(`获取番茄钟历史失败: ${errorText || response.status}`)
-        }
-      }
-
-      return await response.json()
+      return await this.request('/pomodoro/sessions', {}, '获取番茄钟历史失败')
     } catch (error) {
       console.error('Error in getPomodoroHistory:', error)
       throw error
@@ -214,25 +206,7 @@ export const apiClient = {
   // 获取番茄钟设置
   async getPomodoroSettings() {
     try {
-      const headers = await this.getAuthHeader()
-
-      const response = await fetch(`${API_BASE_URL}/pomodoro/settings`, {
-        headers
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Get pomodoro settings error:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `获取番茄钟设置失败 (${response.status})`)
-        } catch {
-          throw new Error(`获取番茄钟设置失败: ${errorText || response.status}`)
-        }
-      }
-
-      return await response.json()
+      return await this.request('/pomodoro/settings', {}, '获取番茄钟设置失败')
     } catch (error) {
       console.error('Error in getPomodoroSettings:', error)
       throw error
@@ -242,27 +216,14 @@ export const apiClient = {
   // 保存番茄钟设置
   async savePomodoroSettings(settings) {
     try {
-      const headers = await this.getAuthHeader()
-
-      const response = await fetch(`${API_BASE_URL}/pomodoro/settings`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(settings)
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Save pomodoro settings error:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `保存番茄钟设置失败 (${response.status})`)
-        } catch {
-          throw new Error(`保存番茄钟设置失败: ${errorText || response.status}`)
-        }
-      }
-
-      return await response.json()
+      return await this.request(
+        '/pomodoro/settings',
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings)
+        },
+        '保存番茄钟设置失败'
+      )
     } catch (error) {
       console.error('Error in savePomodoroSettings:', error)
       throw error
@@ -272,27 +233,7 @@ export const apiClient = {
   // 获取个人资料
   async fetchProfile() {
     try {
-      const headers = await this.getAuthHeader()
-
-      const response = await fetch(`${API_BASE_URL}/profile`, {
-        headers,
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error fetching profile:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `获取个人资料失败 (${response.status})`)
-        } catch {
-          throw new Error(`获取个人资料失败: ${errorText || response.status}`)
-        }
-      }
-
-      const data = await response.json()
-      console.log('Profile fetched successfully:', data)
-      return data
+      return await this.request('/profile', {}, '获取个人资料失败')
     } catch (error) {
       console.error('Error in fetchProfile:', error)
       throw error
@@ -302,29 +243,14 @@ export const apiClient = {
   // 更新个人资料
   async updateProfile(profileData) {
     try {
-      const headers = await this.getAuthHeader()
-
-      const response = await fetch(`${API_BASE_URL}/profile`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(profileData)
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error updating profile:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `更新个人资料失败 (${response.status})`)
-        } catch {
-          throw new Error(`更新个人资料失败: ${errorText || response.status}`)
-        }
-      }
-
-      const data = await response.json()
-      console.log('Profile updated successfully:', data)
-      return data
+      return await this.request(
+        '/profile',
+        {
+          method: 'PUT',
+          body: JSON.stringify(profileData)
+        },
+        '更新个人资料失败'
+      )
     } catch (error) {
       console.error('Error in updateProfile:', error)
       throw error
@@ -334,35 +260,18 @@ export const apiClient = {
   // 上传头像
   async uploadAvatar(file) {
     try {
-      // 使用FormData上传文件
       const formData = new FormData()
       formData.append('avatar', file)
 
-      const headers = await this.getAuthHeader()
-      // 对于FormData请求，不要手动设置Content-Type
-      delete headers['Content-Type']
-
-      const response = await fetch(`${API_BASE_URL}/profile/avatar`, {
-        method: 'POST',
-        headers,
-        body: formData
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Error uploading avatar:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `上传头像失败 (${response.status})`)
-        } catch {
-          throw new Error(`上传头像失败: ${errorText || response.status}`)
-        }
-      }
-
-      const data = await response.json()
-      console.log('Avatar uploaded successfully:', data)
-      return data
+      return await this.request(
+        '/profile/avatar',
+        {
+          method: 'POST',
+          body: formData,
+          isFormData: true
+        },
+        '上传头像失败'
+      )
     } catch (error) {
       console.error('Error in uploadAvatar:', error)
       throw error
@@ -372,27 +281,18 @@ export const apiClient = {
   // 密码重置请求
   async requestPasswordReset(email) {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
+      return await this.request(
+        '/auth/reset-password',
+        {
+          method: 'POST',
+          body: JSON.stringify({ email }),
+          requiresAuth: false,
+          headers: {
+            'Content-Type': 'application/json'
+          }
         },
-        body: JSON.stringify({ email })
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('Password reset request error:', errorText)
-
-        try {
-          const errorData = JSON.parse(errorText)
-          throw new Error(errorData.detail || `密码重置请求失败 (${response.status})`)
-        } catch {
-          throw new Error(`密码重置请求失败: ${errorText || response.status}`)
-        }
-      }
-
-      return await response.json()
+        '密码重置请求失败'
+      )
     } catch (error) {
       console.error('Error in requestPasswordReset:', error)
       throw error
@@ -401,49 +301,31 @@ export const apiClient = {
 
   // 检查服务健康状态
   async healthCheck() {
-    try {
-      // Try the main API health check
-      console.log(`Checking API health at: ${API_BASE_URL}/api/`)
+    const baseUrl = API_BASE_URL || ''
+    const urls = [`${baseUrl}/api/`, `${baseUrl}/`]
 
-      const response = await fetch(`${API_BASE_URL}/api/`)
-      if (!response.ok) {
-        console.error(`API health check failed with status: ${response.status}`)
-
-        // Try the root health check
-        console.log(`Trying root health check at: ${API_BASE_URL}/`)
-        const rootResponse = await fetch(`${API_BASE_URL}/`)
-        if (!rootResponse.ok) {
+    for (const url of urls) {
+      try {
+        const response = await fetch(url)
+        if (response.ok) {
+          const contentType = response.headers.get('Content-Type') || ''
+          if (contentType.includes('application/json')) {
+            return await response.json()
+          }
+          const message = await response.text()
           return {
-            status: "error",
-            message: `API服务不可用 (${response.status})`
+            status: 'ok',
+            message: message || '服务可用'
           }
         }
-
-        const rootData = await rootResponse.json()
-        return rootData
+      } catch (error) {
+        console.error('API connection error:', error)
       }
+    }
 
-      const data = await response.json()
-      console.log("API health check response:", data)
-      return data
-    } catch (error) {
-      console.error("API connection error:", error)
-
-      // Try root endpoint as fallback
-      try {
-        const rootResponse = await fetch(`${API_BASE_URL}/`)
-        if (rootResponse.ok) {
-          const rootData = await rootResponse.json()
-          return rootData
-        }
-      } catch (e) {
-        console.error("Root API check also failed:", e)
-      }
-
-      return {
-        status: "error",
-        message: `无法连接到API服务: ${error.message}`
-      }
+    return {
+      status: 'error',
+      message: '无法连接到API服务'
     }
   }
 }

@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -97,11 +97,20 @@ const popupPosition = ref({})
 const showColorPicker = ref(false)
 const isEditing = ref(false)
 
+const props = defineProps({
+    todoEvents: {
+        type: Array,
+        default: () => []
+    }
+})
+
+const emit = defineEmits(['schedule-select', 'event-updated', 'schedule-removed'])
+
 // FullCalendar 配置
 const calendarOptions = ref({
     plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
     initialView: 'timeGridWeek',
-    events: events.value,
+        events: [],
     headerToolbar: {
         left: 'prev,next today',
         center: 'title',
@@ -129,6 +138,46 @@ const calendarOptions = ref({
     select: handleSelect,
     eventDrop: handleEventDrop,
     eventClick: openEventPopup
+})
+
+const syncEventsToCalendar = async (incomingEvents = []) => {
+    const normalized = (incomingEvents || []).map((event) => ({
+        ...event,
+        color: event.color || '#4dabf7',
+        allDay: event.allDay ?? false
+    }))
+
+    events.value = normalized
+    calendarOptions.value.events = normalized
+
+    await nextTick()
+    const api = calendarRef.value?.getApi()
+    if (!api) return
+
+    api.removeAllEvents()
+    normalized.forEach((event) => {
+        api.addEvent({
+            id: event.id,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+            allDay: event.allDay,
+            backgroundColor: event.color,
+            borderColor: event.color
+        })
+    })
+}
+
+watch(
+    () => props.todoEvents,
+    (next) => {
+        syncEventsToCalendar(next)
+    },
+    { immediate: true, deep: true }
+)
+
+onMounted(() => {
+    syncEventsToCalendar(props.todoEvents)
 })
 
 // 计算当前月份和年份
@@ -239,30 +288,14 @@ function addTask() {
     showTaskForm.value = false
 }
 
-// 删除事件
-function deleteEvent(event) {
-    const index = events.value.findIndex(e => e.id === event.id)
-    if (index > -1) {
-        events.value.splice(index, 1)
-        calendarRef.value.getApi().getEventById(event.id)?.remove()
-    }
-}
-
 // 处理拖拽创建
 function handleSelect(selectInfo) {
-    const title = prompt('请输入任务标题:')
-    if (title) {
-        const newEvent = {
-            id: uuidv4(),
-            title,
-            start: selectInfo.startStr,
-            end: selectInfo.endStr,
-            color: taskColors[Math.floor(Math.random() * taskColors.length)],
-            allDay: selectInfo.allDay
-        }
-        events.value.push(newEvent)
-        calendarRef.value.getApi().addEvent(newEvent)
-    }
+    emit('schedule-select', {
+        start: selectInfo.startStr,
+        end: selectInfo.endStr,
+        allDay: selectInfo.allDay
+    })
+    calendarRef.value?.getApi()?.unselect()
 }
 
 function handleEventDrop(dropInfo) {
@@ -270,6 +303,11 @@ function handleEventDrop(dropInfo) {
     if (event) {
         event.start = dropInfo.event.startStr
         event.end = dropInfo.event.endStr
+        emit('event-updated', {
+            id: event.id,
+            start: dropInfo.event.startStr,
+            end: dropInfo.event.endStr
+        })
     }
 }
 
@@ -331,14 +369,21 @@ function saveEventChanges() {
         Object.assign(event, editingEvent.value)
 
         // 更新日历显示
-        const calendarApi = calendarRef.value.getApi()
-        const fcEvent = calendarApi.getEventById(event.id)
+        const calendarApi = calendarRef.value?.getApi()
+        const fcEvent = calendarApi?.getEventById(event.id)
         if (fcEvent) {
             fcEvent.setProp('title', event.title)
             fcEvent.setProp('backgroundColor', event.color)
             fcEvent.setStart(event.start)
             fcEvent.setEnd(event.end)
         }
+        emit('event-updated', {
+            id: event.id,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+            color: event.color
+        })
     }
     closeEventPopup()
 }
@@ -350,7 +395,10 @@ function toggleEditMode() {
 
 // 处理删除并关闭弹窗
 function handleDelete() {
-    deleteEvent(editingEvent.value)
+    if (!editingEvent.value) return
+    const api = calendarRef.value?.getApi()
+    api?.getEventById(editingEvent.value.id)?.remove()
+    emit('schedule-removed', editingEvent.value.id)
     closeEventPopup()
 }
 </script>

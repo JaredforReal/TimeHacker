@@ -1,25 +1,38 @@
 # 前端开发说明：
+
+## 项目完成度与规划
+
+- **当前完成度**: Vue 3 + Vite 脚手架已就绪，Pinia/Supabase 完成登录态管理与和后端的待办、番茄钟、个人资料 API 对接，首页聚合了 `TodoList`、`PomodoroTimer`、`Calendar` 三大组件，基础路由守卫与密码重置流程串联成功。
+- **已知缺口**: `HomeView` 中引用了未定义的 `selectedDate` 等状态导致运行时报错；路由 `profile` 未受 `requiresAuth` 保护；错误/加载态提示大多注释掉；缺乏 Vitest/Cypress 等测试与 Storybook 级别的组件沉淀；构建产物未集成 CI、环境变量约束也未文档化。
+- **建议迭代**:
+
+1. 补齐 `HomeView`、`Calendar` 等组件的状态管理与边界处理，统一错误与加载提示风格。
+2. 强化认证链路：在路由守卫与 `apiClient` 中对 401/403 做自动刷新或登出，引入统一的 API 拦截器与事件总线。
+3. 引入 Vitest 单测与 Cypress 端到端测试，覆盖登录、待办增删改查、番茄钟流程，并用 Mock Service Worker 脱离真实后端。
+4. 建立 UI 设计体系（例如 UnoCSS/Tailwind + Storybook），完善响应式布局、暗色主题及可访问性。
+
 ## 环境准备
 
 克隆仓库到本地
+
 ```bash
 git clone https://github.com/JaredforReal/TimeHacker.git
 ```
 
-安装好nodejs与vite后，在项目的根目录：
+安装好 nodejs 与 vite 后，在项目的根目录：
+
 ```bash
 npm install
 ```
 
 开发者模式：
+
 ```bash
 npm run dev
 ```
 
-## PR操作
-参考：[B站-Github合作流程](https://www.bilibili.com/video/BV19e4y1q7JJ/?spm_id_from=333.337.search-card.all.click&vd_source=d497b3197440772fec7efce0bf91063e)
-
 ## 项目结构
+
 ```
 frontend/
 ├── public/
@@ -58,12 +71,11 @@ frontend/
 └── vite.config.js              # Vite构建配置
 ```
 
-
 ---
+
 # [后端](https://github.com/JaredforReal/timehacker-api)接口说明：
 
 date: 2025-05-10
-
 
 这份文档详细介绍了 TimeHacker 项目的 API 接口，供前端开发者使用。
 
@@ -72,6 +84,7 @@ date: 2025-05-10
 **基础 URL**: `http://117.72.112.49:8000`
 
 所有 API 请求需要在 Headers 中携带授权信息：
+
 ```
 Authorization: Bearer <access_token>
 Content-Type: application/json
@@ -84,6 +97,7 @@ Content-Type: application/json
 **接口**: `POST /token`
 
 **请求体**:
+
 ```json
 {
   "email": "user@example.com",
@@ -92,6 +106,7 @@ Content-Type: application/json
 ```
 
 **响应**:
+
 ```json
 {
   "access_token": "eyJxxxxx...",
@@ -106,6 +121,7 @@ Content-Type: application/json
 **接口**: `GET /api/` 或 `GET /`
 
 **响应**:
+
 ```json
 {
   "status": "ok",
@@ -121,6 +137,7 @@ Content-Type: application/json
 **接口**: `GET /todos`
 
 **响应**: 待办事项列表
+
 ```json
 [
   {
@@ -140,6 +157,7 @@ Content-Type: application/json
 **接口**: `POST /todos`
 
 **请求体**:
+
 ```json
 {
   "title": "买牛奶",
@@ -148,6 +166,7 @@ Content-Type: application/json
 ```
 
 **响应**: 创建的待办事项
+
 ```json
 {
   "id": "456",
@@ -165,6 +184,7 @@ Content-Type: application/json
 **接口**: `PUT /todos/{todo_id}`
 
 **请求体**:
+
 ```json
 {
   "title": "更新的标题",
@@ -174,6 +194,7 @@ Content-Type: application/json
 ```
 
 **响应**: 更新后的待办事项
+
 ```json
 {
   "id": "456",
@@ -199,6 +220,7 @@ Content-Type: application/json
 **接口**: `POST /pomodoro/sessions`
 
 **请求体**:
+
 ```json
 {
   "title": "学习编程",
@@ -208,6 +230,7 @@ Content-Type: application/json
 ```
 
 **响应**: 保存的番茄钟会话
+
 ```json
 {
   "id": "789",
@@ -223,7 +246,8 @@ Content-Type: application/json
 
 **接口**: `GET /pomodoro/sessions`
 
-**响应**: 最近50条番茄钟记录
+**响应**: 最近 50 条番茄钟记录
+
 ```json
 [
   {
@@ -242,6 +266,7 @@ Content-Type: application/json
 **接口**: `GET /pomodoro/settings`
 
 **响应**: 用户的番茄钟设置
+
 ```json
 {
   "workTime": 25,
@@ -256,6 +281,7 @@ Content-Type: application/json
 **接口**: `PUT /pomodoro/settings`
 
 **请求体**:
+
 ```json
 {
   "workTime": 30,
@@ -266,6 +292,7 @@ Content-Type: application/json
 ```
 
 **响应**: 更新后的设置
+
 ```json
 {
   "workTime": 30,
@@ -286,6 +313,7 @@ Content-Type: application/json
 ```
 
 常见错误状态码：
+
 - 400: 请求参数错误
 - 401: 未认证或认证过期
 - 403: 权限不足

@@ -25,6 +25,7 @@ const routes = [
     path: '/profile',
     name: 'profile',
     component: ProfileView,
+    meta: { requiresAuth: true }
   },
   {
     path: '/reset-password',
@@ -45,7 +46,7 @@ router.beforeEach(async (to, from, next) => {
     const { data: { session } } = await supabase.auth.getSession()
 
     // 需要认证但未登录 (排除home页面)
-    if (to.meta.requiresAuth && !session && to.name !== 'home') {
+    if (to.meta.requiresAuth && !session) {
       next('/login')
     }
     // 已登录但访问登录页

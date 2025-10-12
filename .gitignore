@@ -13,8 +13,9 @@ dist-ssr
 *.local
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+# Exclude the whole .vscode directory from the repo
+.vscode/
+.idea
 .idea
 .DS_Store
 *.suo
@@ -24,3 +25,18 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Tests and coverage artifacts (do not commit)
+coverage/
+coverage-*/
+reports/
+*.lcov
+*.coverage
+*.py,cover
+
+# Vite/Vitest caches
+.vite/
+.vitest/
+
+# Prevent committing test files
+src/**/__tests__/**

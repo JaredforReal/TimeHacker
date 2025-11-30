@@ -1,98 +1,156 @@
+/**
+ * 用户状态管理
+ * 自建 JWT 认证，无 Supabase 依赖
+ */
 import { defineStore } from 'pinia'
-import { supabase } from '../supabase'
+import { apiClient } from '../api'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
-    user: null,
+    user: apiClient.getUser(),
     loading: false,
   }),
+
   getters: {
     isAuthenticated() {
-      return !!this.user
+      return !!this.user && !!apiClient.getAccessToken()
     }
   },
+
   actions: {
-    async fetchUser() {
+    /**
+     * 用户注册
+     */
+    async register(email, password) {
       this.loading = true
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        this.user = user
-        console.log("Current user:", user?.email || "Not logged in")
-        return user
-      } catch (error) {
-        console.error("Error fetching user:", error)
-        return null
+        const result = await apiClient.register(email, password)
+        console.log('注册成功:', result.email)
+        return result
       } finally {
         this.loading = false
       }
     },
+
+    /**
+     * 用户登录
+     */
+    async login(email, password) {
+      this.loading = true
+      try {
+        const result = await apiClient.login(email, password)
+        // 从 JWT 解析用户信息或直接获取 profile
+        const profile = await apiClient.fetchProfile()
+        this.user = {
+          email,
+          id: profile.user_id,
+          ...profile
+        }
+        apiClient.setUser(this.user)
+        console.log('登录成功:', email)
+        return result
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * 获取当前用户（从本地存储恢复）
+     */
+    async fetchUser() {
+      this.loading = true
+      try {
+        const token = apiClient.getAccessToken()
+        if (!token) {
+          this.user = null
+          return null
+        }
+
+        // 尝试获取用户资料来验证 token 有效性
+        try {
+          const profile = await apiClient.fetchProfile()
+          this.user = {
+            id: profile.user_id,
+            ...profile
+          }
+          apiClient.setUser(this.user)
+          console.log('用户已恢复:', this.user.email || this.user.name)
+          return this.user
+        } catch (error) {
+          // Token 无效或已过期
+          console.log('Token 无效，清除登录状态')
+          apiClient.clearTokens()
+          this.user = null
+          return null
+        }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * 设置用户（手动）
+     */
     setUser(user) {
       this.user = user
+      if (user) {
+        apiClient.setUser(user)
+      }
     },
+
+    /**
+     * 登出
+     */
     async signOut() {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      await apiClient.logout()
       this.user = null
     },
 
-    // 刷新认证令牌 - 在认证失败时尝试刷新
+    /**
+     * 刷新认证令牌
+     */
     async refreshSession() {
       try {
-        const { data, error } = await supabase.auth.refreshSession()
-        if (error) throw error
-        this.user = data.user
-        console.log("Session refreshed successfully")
-        return true
+        const token = await apiClient.refreshAccessToken()
+        if (token) {
+          console.log('Token 刷新成功')
+          return true
+        }
+        return false
       } catch (error) {
-        console.error("Failed to refresh session:", error)
+        console.error('刷新 Token 失败:', error)
         return false
       }
     },
-    
-    // 更新用户资料
-    // 这里的 profileData 应该包含用户的所有可更新信息
+
+    /**
+     * 更新用户资料
+     */
     async updateProfile(profileData) {
       try {
-        const { data, error } = await supabase.auth.updateUser({
-          email: profileData.email,
-          password: profileData.password || undefined,
-        });
-        if (error) throw error;
-
-        // 更新其他用户信息（如头像、姓名等）
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({
-            name: profileData.name,
-            bio: profileData.bio,
-            school: profileData.school,
-            location: profileData.location,
-            avatar: profileData.avatar,
-          })
-          .eq('id', this.user.id);
-        if (updateError) throw updateError;
-
+        const result = await apiClient.updateProfile(profileData)
         // 更新本地状态
-        this.user = { ...this.user, ...profileData };
+        this.user = { ...this.user, ...result }
+        apiClient.setUser(this.user)
+        return result
       } catch (error) {
-        console.error('Failed to update profile:', error);
-        throw error;
+        console.error('更新资料失败:', error)
+        throw error
       }
     },
 
-    // 验证用户凭据
-    async verifyCredentials(email, password) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        return true;
-      } catch (error) {
-        console.error('Failed to verify credentials:', error);
-        return false;
-      }
+    /**
+     * 请求密码重置
+     */
+    async requestPasswordReset(email) {
+      return await apiClient.forgotPassword(email)
+    },
+
+    /**
+     * 确认密码重置
+     */
+    async confirmPasswordReset(token, newPassword) {
+      return await apiClient.resetPassword(token, newPassword)
     }
   }
 })

@@ -77,9 +77,10 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { supabase } from '../supabase'; // 确保正确导入 Supabase 客户端
+import { useUserStore } from '../stores/user';
 
 const router = useRouter();
+const userStore = useUserStore();
 
 // 是否处于注册模式
 const isRegistering = ref(false);
@@ -116,12 +117,7 @@ const loginUser = async () => {
     loading.value = true;
     error.value = '';
 
-    const { data, error: authError } = await supabase.auth.signInWithPassword({
-      email: form.value.email,
-      password: form.value.password,
-    });
-
-    if (authError) throw authError;
+    await userStore.login(form.value.email, form.value.password);
     router.push('/home'); // 跳转到主页
   } catch (err) {
     error.value = err.message || '登录失败，请重试';
@@ -136,28 +132,9 @@ const registerUser = async () => {
     loading.value = true;
     error.value = '';
 
-    // 使用邮箱生成头像
-    const avatarUrl = `https://api.dicebear.com/9.x/avataaars/svg?seed=${form.value.email}&size=128&backgroundColor=transparent`;
+    await userStore.register(form.value.email, form.value.password);
 
-    // 调用 Supabase 注册用户
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: form.value.email,
-      password: form.value.password,
-    });
-
-    if (signUpError) throw signUpError;
-
-    // 保存用户信息到 profiles 表
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert({
-        id: data.user.id,
-        avatar: avatarUrl,
-      });
-
-    if (profileError) throw profileError;
-
-    alert('注册成功！请检查您的邮箱以确认账户');
+    alert('注册成功！请登录');
     toggleMode(); // 切换到登录模式
   } catch (err) {
     error.value = err.message || '注册失败，请重试';

@@ -3,7 +3,7 @@ import Login from '../views/LoginView.vue'
 import Home from '../views/HomeView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
-import { supabase } from '../supabase.js'
+import { apiClient } from '../api'
 
 const routes = [
   {
@@ -42,15 +42,15 @@ const router = createRouter({
 // 添加路由守卫
 router.beforeEach(async (to, from, next) => {
   try {
-    // 获取当前会话
-    const { data: { session } } = await supabase.auth.getSession()
+    // 检查是否有有效的访问令牌
+    const hasToken = !!apiClient.getAccessToken()
 
-    // 需要认证但未登录 (排除home页面)
-    if (to.meta.requiresAuth && !session) {
+    // 需要认证但未登录
+    if (to.meta.requiresAuth && !hasToken) {
       next('/login')
     }
     // 已登录但访问登录页
-    else if (to.name === 'login' && session) {
+    else if (to.name === 'login' && hasToken) {
       next('/home')
     }
     // 其他情况正常放行

@@ -5,19 +5,8 @@
 </template>
 
 <script setup>
-import { supabase } from './supabase'
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
-
-// 监听认证状态变化
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN') {
-    router.push('/home')
-  } else if (event === 'SIGNED_OUT') {
-    router.push('/')
-  }
-})
+// 认证状态由 router 守卫和 Pinia store 管理
+// 不再需要 Supabase 的 onAuthStateChange
 </script>
 
 <style>

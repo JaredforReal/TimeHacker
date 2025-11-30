@@ -1,10 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { supabase } from '../supabase.js';
+import { useUserStore } from '../stores/user';
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 
 // 状态变量
 const isLoading = ref(false);
@@ -13,6 +14,7 @@ const success = ref(false);
 const newPassword = ref('');
 const confirmPassword = ref('');
 const passwordsMatch = ref(true);
+const resetToken = ref('');
 
 // 处理密码重置
 const handleResetPassword = async () => {
@@ -22,8 +24,8 @@ const handleResetPassword = async () => {
     return;
   }
   
-  if (newPassword.value.length < 8) {
-    error.value = '密码长度必须至少为8个字符';
+  if (newPassword.value.length < 6) {
+    error.value = '密码长度必须至少为6个字符';
     return;
   }
   
@@ -33,12 +35,8 @@ const handleResetPassword = async () => {
     isLoading.value = true;
     error.value = null;
 
-    // 使用Supabase提供的方法更新密码
-    const { error: resetError } = await supabase.auth.updateUser({
-      password: newPassword.value
-    });
-
-    if (resetError) throw resetError;
+    // 使用新的 API 重置密码
+    await userStore.confirmPasswordReset(resetToken.value, newPassword.value);
     
     success.value = true;
     
@@ -53,38 +51,19 @@ const handleResetPassword = async () => {
     
   } catch (err) {
     console.error('密码重置失败:', err);
-    error.value = `密码重置失败: ${err.message || '请重试'}`;
+    error.value = err.message || '密码重置失败，请重试';
   } finally {
     isLoading.value = false;
   }
 };
 
-// 检查URL中的token和密码重置会话
-onMounted(async () => {
-  // 检查URL中是否包含hash部分（Supabase 会在重定向时添加）
-  const hashParams = new URLSearchParams(window.location.hash.substring(1));
-  const accessToken = hashParams.get('access_token');
-  const refreshToken = hashParams.get('refresh_token');
-  const type = hashParams.get('type');
-
-  if (type === 'recovery' && accessToken) {
-    try {
-      isLoading.value = true;
-      
-      // 设置会话
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      });
-      
-      if (sessionError) throw sessionError;
-      
-    } catch (err) {
-      console.error('设置恢复会话失败:', err);
-      error.value = '链接无效或已过期，请重新请求密码重置';
-    } finally {
-      isLoading.value = false;
-    }
+// 检查URL中的token
+onMounted(() => {
+  // 从 URL 参数获取 token
+  const token = route.query.token;
+  
+  if (token) {
+    resetToken.value = token;
   } else {
     error.value = '无效的密码重置链接';
   }
@@ -131,9 +110,9 @@ onMounted(async () => {
           type="password" 
           required 
           placeholder="请输入新密码"
-          minlength="8"
+          minlength="6"
         />
-        <small class="form-hint">密码长度至少为8个字符</small>
+        <small class="form-hint">密码长度至少为6个字符</small>
       </div>
       
       <div class="form-group">

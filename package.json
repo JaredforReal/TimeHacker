@@ -1,7 +1,7 @@
 {
   "name": "timehacker",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,7 +17,6 @@
     "@fullcalendar/interaction": "^6.1.17",
     "@fullcalendar/timegrid": "^6.1.17",
     "@fullcalendar/vue3": "^6.1.17",
-    "@supabase/supabase-js": "^2.49.4",
     "date-fns": "^4.1.0",
     "pinia": "^3.0.2",
     "uuid": "^11.1.0",
